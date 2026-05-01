@@ -1,12 +1,6 @@
-extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
+extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0' as graphV1
 
 targetScope = 'subscription'
-
-@description('Azure region for the workload resource group.')
-param location string = 'westeurope'
-
-@description('Resource group that contains the TraceOps workload.')
-param resourceGroupName string = 'rg-traceops-prod'
 
 @description('GitHub organization or user that owns the repository.')
 param githubOwner string
@@ -25,12 +19,7 @@ var appDeployName = 'github-traceops-app-deploy-${normalizedEnvironmentName}'
 var githubIssuer = 'https://token.actions.githubusercontent.com'
 var githubAudience = 'api://AzureADTokenExchange'
 
-resource workloadResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
-  name: resourceGroupName
-  location: location
-}
-
-resource appDeploymentApplication 'Microsoft.Graph/applications@v1.0' = {
+resource appDeploymentApplication 'graphV1:Microsoft.Graph/applications@v1.0' = {
   uniqueName: appDeployName
   displayName: appDeployName
   signInAudience: 'AzureADMyOrg'
@@ -46,20 +35,11 @@ resource appDeploymentApplication 'Microsoft.Graph/applications@v1.0' = {
   }
 }
 
-resource appDeploymentServicePrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+resource appDeploymentServicePrincipal 'graphV1:Microsoft.Graph/servicePrincipals@v1.0' = {
   appId: appDeploymentApplication.appId
-}
-
-module appDeploymentRbac 'modules/app-deployment-rbac.bicep' = {
-  name: 'traceops-app-deployment-rbac'
-  scope: workloadResourceGroup
-  params: {
-    appDeploymentPrincipalId: appDeploymentServicePrincipal.id
-  }
 }
 
 output appDeployClientId string = appDeploymentApplication.appId
 output appDeployPrincipalObjectId string = appDeploymentServicePrincipal.id
 output tenantId string = tenant().tenantId
 output subscriptionId string = subscription().subscriptionId
-output resourceGroup string = workloadResourceGroup.name
