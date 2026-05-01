@@ -11,8 +11,8 @@ param repositoryName string
 @description('Deployment environment name used in the Azure identity name.')
 param environmentName string = 'production'
 
-@description('Branch allowed to deploy production resources.')
-param mainBranchName string = 'main'
+@description('GitHub environment allowed to use the app deployment identity.')
+param githubEnvironmentName string = 'production'
 
 var normalizedEnvironmentName = toLower(replace(environmentName, '_', '-'))
 var appDeployName = 'github-traceops-app-deploy-${normalizedEnvironmentName}'
@@ -24,11 +24,11 @@ resource appDeploymentApplication 'graphV1:Microsoft.Graph/applications@v1.0' = 
   displayName: appDeployName
   signInAudience: 'AzureADMyOrg'
 
-  resource mainBranchFederatedCredential 'federatedIdentityCredentials@v1.0' = {
-    name: '${appDeployName}/github-main'
-    description: 'GitHub Actions main branch app deployment for ${githubOwner}/${repositoryName}.'
+  resource productionEnvironmentFederatedCredential 'federatedIdentityCredentials@v1.0' = {
+    name: '${appDeployName}/github-production'
+    description: 'GitHub Actions production environment app deployment for ${githubOwner}/${repositoryName}.'
     issuer: githubIssuer
-    subject: 'repo:${githubOwner}/${repositoryName}:ref:refs/heads/${mainBranchName}'
+    subject: 'repo:${githubOwner}/${repositoryName}:environment:${githubEnvironmentName}'
     audiences: [
       githubAudience
     ]
