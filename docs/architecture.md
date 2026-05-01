@@ -1,100 +1,88 @@
 # Architecture
 
-This document describes the technical architecture of the project.
-
-Fill this out before building major features.
+This document describes the technical architecture of TraceOps.Dev.
 
 ---
 
 ## Project Purpose
 
-TODO: What problem does this project solve?
-
-Example:
-
-This project provides a lightweight system for tracking findings, issues, repositories, and technical debt.
+TraceOps.Dev is an AI-native issue, feature, and audit tracking platform designed for AI agents and repository operations workflows. It provides persistent workflow state and a coordination layer for agent-driven repository work.
 
 ---
 
 ## High-Level Architecture
 
-TODO: Describe the system at a high level.
-
-Example:
-
 ```text
-User
-  -> Frontend
+User / Agent
+  -> API (TypeScript on Azure Functions)
+  -> Storage (Azure Table Storage)
+  -> Observability (Azure Monitor / Application Insights)
+
+Agent Integrations
+  -> MCP Server (TypeScript)
   -> API
-  -> Storage/Database
-  -> Azure observability
 ```
 
 ---
 
 ## Main Components
 
-TODO: List the main components.
-
-Example:
-
-| Component | Purpose |
-|---|---|
-| Frontend | User interface |
-| API | Business logic and data access |
-| Storage | Persists application data |
-| GitHub Actions | CI/CD |
-| Azure Infrastructure | Hosting and observability |
+| Component | Technology | Purpose |
+|---|---|---|
+| API Backend | TypeScript + Azure Functions | Handles business logic, validation, and data access |
+| Storage | Azure Table Storage | Persists issues, features, findings, and workflow state |
+| MCP Server | TypeScript | Exposes agent-friendly interfaces for repository operations workflows |
+| Infrastructure | Bicep | Defines and deploys Azure resources as code |
+| Scripts | PowerShell + Bash | Supports local/dev/ops automation tasks |
+| Documentation | Markdown | Captures architecture, operations, and design decisions |
 
 ---
 
 ## Azure Resources
 
-TODO: List expected Azure resources.
-
-Example:
-
 | Resource | Purpose |
 |---|---|
-| Resource Group | Groups project resources |
-| Function App | Hosts API |
-| Storage Account | Runtime or application storage |
-| Application Insights | Application monitoring |
-| Log Analytics | Central log workspace |
+| Resource Group | Logical container for all TraceOps.Dev resources |
+| Function App | Hosts the TypeScript Azure Functions API |
+| Storage Account (Table) | Stores application entities and workflow state |
+| Application Insights | Collects telemetry and application diagnostics |
+| Log Analytics Workspace | Centralized log storage and querying |
 
 ---
 
 ## Data Model
 
-TODO: Describe important entities.
-
-Example:
+Core entities include:
 
 ```text
 Issue
-Repository
-Finding
-User
-Project
+Feature
+AuditFinding
+WorkflowState
+AgentRun
+RepositoryReference
 ```
 
 ---
 
 ## Request / Data Flow
 
-TODO: Describe how data moves through the system.
-
-Example:
-
 ```text
-Client -> API endpoint -> validation -> storage -> response
+Client or Agent
+  -> HTTP-triggered Azure Function
+  -> Validation + domain logic
+  -> Azure Table Storage read/write
+  -> Response payload
+
+Agent Tooling
+  -> TypeScript MCP server
+  -> API endpoints
+  -> Storage-backed state and tracking
 ```
 
 ---
 
 ## Deployment Flow
-
-Expected pattern:
 
 ```text
 Pull Request:
@@ -113,46 +101,43 @@ Main:
 
 ## Security Model
 
-TODO: Describe authentication, authorization, identities, and secrets.
-
-Suggested topics:
-
-- GitHub OIDC
-- Azure managed identities
-- GitHub Secrets
-- Azure Key Vault
-- API authentication
-- RBAC assignments
+- GitHub OIDC is used for Azure authentication from CI/CD.
+- Infrastructure and application deployment identities should be separated.
+- Managed identities are preferred for Azure resource access.
+- Secrets should be stored in GitHub Secrets and/or Azure Key Vault.
+- API authentication and RBAC assignments should be explicitly defined as endpoints are introduced.
 
 ---
 
 ## Environments
 
-TODO: Describe environments.
-
-Example:
-
 | Environment | Purpose |
 |---|---|
-| dev | Development/testing |
-| prod | Production |
+| dev | Development and validation environment |
+| prod | Production environment |
 
 ---
 
 ## Important Decisions
 
-TODO: Document key design decisions.
-
-Example:
-
 ```text
-Decision: Use Azure Table Storage for v0.1.
-Reason: Low cost, simple schema, easy to scale for early usage.
-Tradeoff: Limited query flexibility compared to SQL.
+Decision: Use TypeScript + Azure Functions for backend/API.
+Reason: Fast serverless iteration and strong TypeScript ecosystem.
+Tradeoff: Function execution model and cold start considerations.
+
+Decision: Use Azure Table Storage for initial persistence.
+Reason: Low operational overhead, low cost, and simple entity-based storage.
+Tradeoff: Limited relational/query flexibility compared to SQL databases.
+
+Decision: Expose agent integration via a TypeScript MCP server.
+Reason: Enables structured, tool-oriented interactions for AI agents.
+Tradeoff: Requires careful contract/version management between MCP tools and API.
 ```
 
 ---
 
 ## Open Questions
 
-TODO: Track unresolved architecture questions.
+- What authentication model should external/non-CI clients use for API access?
+- Which retention policy should be applied to workflow state and audit history?
+- Should long-term analytics remain in Table Storage or be projected to another store?
