@@ -1,0 +1,12 @@
+name: Deploy Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "TODO"

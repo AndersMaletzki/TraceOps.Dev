@@ -1,0 +1,28 @@
+name: Infrastructure
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/infrastructure.yml'
+      - 'infra/**'
+  workflow_call:
+    inputs:
+      deploy:
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: infrastructure-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'TODO: Add Bicep build and Azure what-if'
