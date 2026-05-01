@@ -1,0 +1,17 @@
+{
+  "tenantId": "demo-tenant",
+  "repoId": "traceops-dev",
+  "workItemType": "Feature",
+  "category": "Idea",
+  "title": "Add repository audit import script",
+  "description": "Allow AI audit output to be transformed into TraceOps work item creation requests.",
+  "severity": "Medium",
+  "status": "New",
+  "source": "manual",
+  "files": [],
+  "tags": [
+    "workflow",
+    "mvp"
+  ],
+  "createdBy": "maintainer"
+}

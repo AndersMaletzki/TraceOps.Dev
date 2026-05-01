@@ -1,0 +1,7 @@
+{
+  "tenantId": "demo-tenant",
+  "repoId": "traceops-dev",
+  "externalBranchName": "codex/fix-api-key-logging",
+  "externalCommitUrl": "https://github.com/example/traceops-dev/commit/abc123",
+  "externalPrUrl": "https://github.com/example/traceops-dev/pull/42"
+}

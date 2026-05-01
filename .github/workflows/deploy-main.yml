@@ -5,8 +5,21 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
-  placeholder:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "TODO"
+  infrastructure:
+    uses: ./.github/workflows/infrastructure.yml
+    with:
+      deploy: true
+    secrets: inherit
+
+  app:
+    needs: infrastructure
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      function_app_name: ${{ needs.infrastructure.outputs.function_app_name || vars.TRACEOPS_FUNCTION_APP_NAME }}
+      resource_group_name: ${{ needs.infrastructure.outputs.resource_group_name || 'rg-traceops-prod' }}
+    secrets: inherit

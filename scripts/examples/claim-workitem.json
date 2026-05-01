@@ -1,0 +1,6 @@
+{
+  "tenantId": "demo-tenant",
+  "repoId": "traceops-dev",
+  "claimedBy": "codex",
+  "claimDurationMinutes": 60
+}

@@ -1,0 +1,26 @@
+export type TraceOpsConfig = {
+  apiKey: string;
+  storageConnectionString: string;
+  workItemsTableName: string;
+  workItemEventsTableName: string;
+};
+
+export function getConfig(env: NodeJS.ProcessEnv = process.env): TraceOpsConfig {
+  const apiKey = env.TRACEOPS_API_KEY;
+  const storageConnectionString = env.TRACEOPS_STORAGE_CONNECTION_STRING;
+
+  if (!apiKey) {
+    throw new Error("TRACEOPS_API_KEY is required");
+  }
+
+  if (!storageConnectionString) {
+    throw new Error("TRACEOPS_STORAGE_CONNECTION_STRING is required");
+  }
+
+  return {
+    apiKey,
+    storageConnectionString,
+    workItemsTableName: env.TRACEOPS_TABLE_WORKITEMS || "WorkItems",
+    workItemEventsTableName: env.TRACEOPS_TABLE_WORKITEM_EVENTS || "WorkItemEvents"
+  };
+}

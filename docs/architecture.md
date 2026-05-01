@@ -1,143 +1,154 @@
 # Architecture
 
-This document describes the technical architecture of TraceOps.Dev.
+TraceOps.Dev v0.1 is a minimal coordination service for AI agents working on repository audits and operational workflows.
 
----
+It persists structured issues, features, audit findings, and workflow state. It does not modify repositories or perform autonomous git operations.
 
-## Project Purpose
-
-TraceOps.Dev is an AI-native issue, feature, and audit tracking platform designed for AI agents and repository operations workflows. It provides persistent workflow state and a coordination layer for agent-driven repository work.
-
----
-
-## High-Level Architecture
+## v0.1 Architecture
 
 ```text
-User / Agent
-  -> API (TypeScript on Azure Functions)
-  -> Storage (Azure Table Storage)
-  -> Observability (Azure Monitor / Application Insights)
-
-Agent Integrations
-  -> MCP Server (TypeScript)
-  -> API
+Codex / AI Agent
+  -> MCP Server
+  -> TraceOps API
+  -> Azure Table Storage
 ```
 
----
-
-## Main Components
+## Components
 
 | Component | Technology | Purpose |
 |---|---|---|
-| API Backend | TypeScript + Azure Functions | Handles business logic, validation, and data access |
-| Storage | Azure Table Storage | Persists issues, features, findings, and workflow state |
-| MCP Server | TypeScript | Exposes agent-friendly interfaces for repository operations workflows |
-| Infrastructure | Bicep | Defines and deploys Azure resources as code |
-| Scripts | PowerShell + Bash | Supports local/dev/ops automation tasks |
-| Documentation | Markdown | Captures architecture, operations, and design decisions |
+| API | TypeScript + Azure Functions | Validates requests, enforces API key auth, and reads/writes work items |
+| Storage | Azure Table Storage | Stores work items and append-only work item events |
+| MCP Server | TypeScript + official MCP SDK | Exposes concise agent tools that call the API |
+| Infrastructure | Bicep | Defines Azure workload resources |
+| GitHub Actions | OIDC + Azure CLI | Validates, previews, and deploys infra/app changes |
 
----
+## Scope
 
-## Azure Resources
+TraceOps.Dev v0.1 supports:
 
-| Resource | Purpose |
-|---|---|
-| Resource Group | Logical container for all TraceOps.Dev resources |
-| Function App | Hosts the TypeScript Azure Functions API |
-| Storage Account (Table) | Stores application entities and workflow state |
-| Application Insights | Collects telemetry and application diagnostics |
-| Log Analytics Workspace | Centralized log storage and querying |
+- issue tracking
+- feature tracking
+- audit finding tracking
+- workflow state tracking for AI agents
 
----
+TraceOps.Dev v0.1 does not support:
 
-## Data Model
+- branch creation
+- commits or pushes
+- PR creation
+- repository modification
+- billing
+- notifications
+- analytics
+- advanced auth
+- GitHub Apps
+- dashboards or UI
 
-Core entities include:
+## API
 
-```text
-Issue
-Feature
-AuditFinding
-WorkflowState
-AgentRun
-RepositoryReference
-```
-
----
-
-## Request / Data Flow
+All endpoints require `x-api-key`, matched against `TRACEOPS_API_KEY`.
 
 ```text
-Client or Agent
-  -> HTTP-triggered Azure Function
-  -> Validation + domain logic
-  -> Azure Table Storage read/write
-  -> Response payload
-
-Agent Tooling
-  -> TypeScript MCP server
-  -> API endpoints
-  -> Storage-backed state and tracking
+POST  /workitems
+GET   /workitems
+GET   /workitems/{workItemId}
+GET   /workitems/next
+PATCH /workitems/{workItemId}/status
+PATCH /workitems/{workItemId}/claim
+PATCH /workitems/{workItemId}/links
 ```
 
----
+`tenantId` and `repoId` are required for all read/update operations so queries stay inside one Table Storage partition.
 
-## Deployment Flow
+## Storage Design
+
+v0.1 uses two Azure Table Storage tables:
+
+- `WorkItems`
+- `WorkItemEvents`
+
+Work item keys:
 
 ```text
-Pull Request:
-  - install dependencies
-  - build
-  - test
-  - Bicep build
-  - Azure what-if
-
-Main:
-  - deploy infrastructure
-  - deploy application
+PartitionKey = TENANT#<tenantId>#REPO#<repoId>
+RowKey       = ITEM#<yyyyMMddHHmmss>#<shortId>
 ```
 
----
-
-## Security Model
-
-- GitHub OIDC is used for Azure authentication from CI/CD.
-- Infrastructure and application deployment identities should be separated.
-- Managed identities are preferred for Azure resource access.
-- Secrets should be stored in GitHub Secrets and/or Azure Key Vault.
-- API authentication and RBAC assignments should be explicitly defined as endpoints are introduced.
-
----
-
-## Environments
-
-| Environment | Purpose |
-|---|---|
-| dev | Development and validation environment |
-| prod | Production environment |
-
----
-
-## Important Decisions
+Status event keys:
 
 ```text
-Decision: Use TypeScript + Azure Functions for backend/API.
-Reason: Fast serverless iteration and strong TypeScript ecosystem.
-Tradeoff: Function execution model and cold start considerations.
-
-Decision: Use Azure Table Storage for initial persistence.
-Reason: Low operational overhead, low cost, and simple entity-based storage.
-Tradeoff: Limited relational/query flexibility compared to SQL databases.
-
-Decision: Expose agent integration via a TypeScript MCP server.
-Reason: Enables structured, tool-oriented interactions for AI agents.
-Tradeoff: Requires careful contract/version management between MCP tools and API.
+PartitionKey = TENANT#<tenantId>#REPO#<repoId>
+RowKey       = EVT#<yyyyMMddHHmmss>#<shortId>
 ```
 
----
+`workItemId` is the full work item RowKey. Clients treat it as opaque.
 
-## Open Questions
+`files` and `tags` are arrays in API and MCP payloads. They are stored as JSON strings in Table Storage.
 
-- What authentication model should external/non-CI clients use for API access?
-- Which retention policy should be applied to workflow state and audit history?
-- Should long-term analytics remain in Table Storage or be projected to another store?
+## Work Item Contract
+
+Allowed work item types:
+
+- `Issue`
+- `Feature`
+
+Allowed categories:
+
+- `Security`
+- `Bug`
+- `Infra`
+- `Refactor`
+- `Documentation`
+- `Performance`
+- `TechnicalDebt`
+- `Idea`
+
+Allowed severities:
+
+- `Critical`
+- `High`
+- `Medium`
+- `Low`
+- `Info`
+
+Allowed statuses:
+
+- `New`
+- `Accepted`
+- `Claimed`
+- `InProgress`
+- `InReview`
+- `Fixed`
+- `Closed`
+- `WontFix`
+
+## Coordination Rules
+
+- `GET /workitems` defaults `limit` to `10` and caps it at `50`.
+- `GET /workitems/next` defaults to `New` and `Accepted` items, sorted by severity then oldest created time.
+- Status updates write append-only `WorkItemEvents` records.
+- Claims record `claimedBy`, `claimedAt`, and `claimExpiresAt`.
+- Active unexpired claims by another claimant return `409 Conflict`.
+- Link updates store only external branch, commit, and PR metadata.
+
+## Deployment
+
+Pull requests:
+
+```text
+npm install
+npm run build
+npm test
+az bicep build
+az deployment sub what-if
+```
+
+Main branch:
+
+```text
+deploy infrastructure
+deploy Azure Functions API
+```
+
+GitHub Actions use Azure OIDC. Publish profiles are not used.

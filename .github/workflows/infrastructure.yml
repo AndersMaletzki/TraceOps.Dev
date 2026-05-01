@@ -11,7 +11,20 @@ on:
         required: false
         type: boolean
         default: false
+    outputs:
+      function_app_name:
+        description: 'Deployed Function App name'
+        value: ${{ jobs.validate.outputs.function_app_name }}
+      resource_group_name:
+        description: 'Deployed resource group name'
+        value: ${{ jobs.validate.outputs.resource_group_name }}
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy infrastructure'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,5 +37,53 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      function_app_name: ${{ steps.outputs.outputs.functionAppName }}
+      resource_group_name: ${{ steps.outputs.outputs.resourceGroup }}
     steps:
-      - run: echo 'TODO: Add Bicep build and Azure what-if'
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Bicep build
+        run: az bicep build --file infra/workload/main.bicep
+
+      - name: What-if
+        run: >
+          az deployment sub what-if
+          --location westeurope
+          --template-file infra/workload/main.bicep
+          --parameters
+          resourceGroupName=rg-traceops-prod
+          environmentName=prod
+          traceOpsApiKey='${{ secrets.TRACEOPS_API_KEY }}'
+
+      - name: Deploy
+        if: ${{ inputs.deploy == true || github.event.inputs.deploy == 'true' }}
+        id: deploy
+        run: |
+          set -euo pipefail
+          az deployment sub create \
+            --name traceops-workload \
+            --location westeurope \
+            --template-file infra/workload/main.bicep \
+            --parameters \
+            resourceGroupName=rg-traceops-prod \
+            environmentName=prod \
+            traceOpsApiKey='${{ secrets.TRACEOPS_API_KEY }}'
+
+          outputs="$(az deployment sub show --name traceops-workload --query properties.outputs -o json)"
+          echo "functionAppName=$(echo "$outputs" | jq -r '.functionAppName.value')" >> "$GITHUB_OUTPUT"
+          echo "resourceGroup=$(echo "$outputs" | jq -r '.resourceGroup.value')" >> "$GITHUB_OUTPUT"
+
+      - name: Capture outputs
+        if: ${{ steps.deploy.outcome == 'success' }}
+        id: outputs
+        run: |
+          echo "functionAppName=${{ steps.deploy.outputs.functionAppName }}" >> "$GITHUB_OUTPUT"
+          echo "resourceGroup=${{ steps.deploy.outputs.resourceGroup }}" >> "$GITHUB_OUTPUT"

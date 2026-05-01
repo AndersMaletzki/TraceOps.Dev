@@ -1,0 +1,19 @@
+{
+  "tenantId": "demo-tenant",
+  "repoId": "traceops-dev",
+  "workItemType": "Issue",
+  "category": "Security",
+  "title": "API key must not be logged",
+  "description": "Repository audit found request logging paths that should avoid recording x-api-key values.",
+  "severity": "High",
+  "status": "New",
+  "source": "repo-audit",
+  "files": [
+    "api/src/functions/workitems.ts"
+  ],
+  "tags": [
+    "audit",
+    "security"
+  ],
+  "createdBy": "codex"
+}
