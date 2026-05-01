@@ -1,10 +1,12 @@
+extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
+
 targetScope = 'subscription'
 
-@description('Azure region for GitHub identity resources.')
+@description('Azure region for the workload resource group.')
 param location string = 'westeurope'
 
-@description('Resource group that contains GitHub OIDC identities.')
-param resourceGroupName string = 'rg-traceops-github-identities'
+@description('Resource group that contains the TraceOps workload.')
+param resourceGroupName string = 'rg-traceops-prod'
 
 @description('GitHub organization or user that owns the repository.')
 param githubOwner string
@@ -19,35 +21,45 @@ param environmentName string = 'production'
 param mainBranchName string = 'main'
 
 var normalizedEnvironmentName = toLower(replace(environmentName, '_', '-'))
-var identityName = 'id-traceops-github-${normalizedEnvironmentName}'
-var contributorRoleDefinitionId = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+var appDeployName = 'github-traceops-app-deploy-${normalizedEnvironmentName}'
+var githubIssuer = 'https://token.actions.githubusercontent.com'
+var githubAudience = 'api://AzureADTokenExchange'
 
-resource identityResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+resource workloadResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
 }
 
-module githubIdentity 'modules/github-identity.bicep' = {
-  name: 'traceops-github-identity'
-  scope: identityResourceGroup
+resource appDeploymentApplication 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: appDeployName
+  displayName: appDeployName
+  signInAudience: 'AzureADMyOrg'
+
+  resource mainBranchFederatedCredential 'federatedIdentityCredentials@v1.0' = {
+    name: '${appDeployName}/github-main'
+    description: 'GitHub Actions main branch app deployment for ${githubOwner}/${repositoryName}.'
+    issuer: githubIssuer
+    subject: 'repo:${githubOwner}/${repositoryName}:ref:refs/heads/${mainBranchName}'
+    audiences: [
+      githubAudience
+    ]
+  }
+}
+
+resource appDeploymentServicePrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: appDeploymentApplication.appId
+}
+
+module appDeploymentRbac 'modules/app-deployment-rbac.bicep' = {
+  name: 'traceops-app-deployment-rbac'
+  scope: workloadResourceGroup
   params: {
-    location: location
-    identityName: identityName
-    githubOwner: githubOwner
-    repositoryName: repositoryName
-    mainBranchName: mainBranchName
+    appDeploymentPrincipalId: appDeploymentServicePrincipal.id
   }
 }
 
-resource subscriptionContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(subscription().id, resourceGroupName, identityName, contributorRoleDefinitionId)
-  properties: {
-    principalId: githubIdentity.outputs.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleDefinitionId)
-  }
-}
-
-output clientId string = githubIdentity.outputs.clientId
+output appDeployClientId string = appDeploymentApplication.appId
+output appDeployPrincipalObjectId string = appDeploymentServicePrincipal.id
 output tenantId string = tenant().tenantId
 output subscriptionId string = subscription().subscriptionId
+output resourceGroup string = workloadResourceGroup.name

@@ -83,7 +83,9 @@ Expected behavior:
 ## Security Rules
 
 - Use GitHub OIDC for Azure authentication.
-- Use separate identities for infrastructure deployment and app deployment.
+- Use separate app registrations for infrastructure deployment and app deployment.
+- `AZURE_INFRA_CLIENT_ID` comes from `azure-bicep-configs` and is used only by infrastructure workflows.
+- `AZURE_CLIENT_ID` comes from this repository's infrastructure deployment and is used only by app deployment workflows.
 - Prefer managed identities for Azure resource access.
 - Store secrets in GitHub Secrets or Azure Key Vault.
 - Never hardcode secrets, API keys, or connection strings.

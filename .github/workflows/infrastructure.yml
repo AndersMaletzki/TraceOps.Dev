@@ -18,6 +18,9 @@ on:
       resource_group_name:
         description: 'Deployed resource group name'
         value: ${{ jobs.validate.outputs.resource_group_name }}
+      app_deployment_client_id:
+        description: 'App deployment identity client ID for AZURE_CLIENT_ID'
+        value: ${{ jobs.validate.outputs.app_deployment_client_id }}
   workflow_dispatch:
     inputs:
       deploy:
@@ -40,8 +43,20 @@ jobs:
     outputs:
       function_app_name: ${{ steps.outputs.outputs.functionAppName }}
       resource_group_name: ${{ steps.outputs.outputs.resourceGroup }}
+      app_deployment_client_id: ${{ steps.identity_deploy.outputs.appDeployClientId }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate Azure infra login secrets
+        env:
+          AZURE_INFRA_CLIENT_ID: ${{ secrets.AZURE_INFRA_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$AZURE_INFRA_CLIENT_ID" || { echo "::error::Missing repository secret AZURE_INFRA_CLIENT_ID"; exit 1; }
+          test -n "$AZURE_TENANT_ID" || { echo "::error::Missing repository secret AZURE_TENANT_ID"; exit 1; }
+          test -n "$AZURE_SUBSCRIPTION_ID" || { echo "::error::Missing repository secret AZURE_SUBSCRIPTION_ID"; exit 1; }
 
       - name: Azure login
         uses: azure/login@v2
@@ -51,9 +66,22 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Bicep build
-        run: az bicep build --file infra/workload/main.bicep
+        run: |
+          az bicep build --file infra/github-identities/main.bicep
+          az bicep build --file infra/workload/main.bicep
 
-      - name: What-if
+      - name: GitHub identities what-if
+        run: >
+          az deployment sub what-if
+          --location westeurope
+          --template-file infra/github-identities/main.bicep
+          --parameters
+          resourceGroupName=rg-traceops-prod
+          environmentName=prod
+          githubOwner=AndersMaletzki
+          repositoryName=TraceOps.Dev
+
+      - name: Workload what-if
         run: >
           az deployment sub what-if
           --location westeurope
@@ -62,6 +90,26 @@ jobs:
           resourceGroupName=rg-traceops-prod
           environmentName=prod
           traceOpsApiKey='${{ secrets.TRACEOPS_API_KEY }}'
+
+      - name: Deploy GitHub app deployment identity
+        if: ${{ inputs.deploy == true || github.event.inputs.deploy == 'true' }}
+        id: identity_deploy
+        run: |
+          set -euo pipefail
+          az deployment sub create \
+            --name traceops-github-identities \
+            --location westeurope \
+            --template-file infra/github-identities/main.bicep \
+            --parameters \
+            resourceGroupName=rg-traceops-prod \
+            environmentName=prod \
+            githubOwner=AndersMaletzki \
+            repositoryName=TraceOps.Dev
+
+          outputs="$(az deployment sub show --name traceops-github-identities --query properties.outputs -o json)"
+          app_deploy_client_id="$(echo "$outputs" | jq -r '.appDeployClientId.value')"
+          echo "appDeployClientId=$app_deploy_client_id" >> "$GITHUB_OUTPUT"
+          echo "::notice title=AZURE_CLIENT_ID::Set repository secret AZURE_CLIENT_ID to $app_deploy_client_id before running app deployment."
 
       - name: Deploy
         if: ${{ inputs.deploy == true || github.event.inputs.deploy == 'true' }}

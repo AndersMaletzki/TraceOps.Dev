@@ -134,7 +134,14 @@ Allowed statuses:
 
 ## Deployment
 
-TraceOps.Dev uses two GitHub OIDC identities. `AZURE_INFRA_CLIENT_ID` is provisioned by the `azure-bicep-configs` bootstrap and has subscription-level permissions for infrastructure deployment. `AZURE_CLIENT_ID` is provisioned by this monorepo's infrastructure deployment and is used for application deployment.
+TraceOps.Dev uses two GitHub OIDC app registrations. `AZURE_INFRA_CLIENT_ID` is provisioned by the `azure-bicep-configs` bootstrap and has subscription-level permissions for infrastructure deployment. `AZURE_CLIENT_ID` is provisioned by this monorepo's infrastructure deployment and is used for application deployment.
+
+The app deployment identity receives only resource-group-scoped permissions on `rg-traceops-prod`:
+
+- Reader
+- Website Contributor
+
+After infrastructure deployment, the `appDeployClientId` output must be stored as the repository secret `AZURE_CLIENT_ID`.
 
 Pull requests:
 
@@ -149,7 +156,7 @@ az deployment sub what-if
 Main branch:
 
 ```text
-deploy infrastructure
+deploy app deployment identity and workload infrastructure
 deploy Azure Functions API
 ```
 

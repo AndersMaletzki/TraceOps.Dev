@@ -157,13 +157,16 @@ Tool responses are intentionally concise. All tools require `tenantId` and `repo
 Validate Bicep:
 
 ```bash
+az bicep build --file infra/github-identities/main.bicep
 az bicep build --file infra/workload/main.bicep
 ```
 
 TraceOps.Dev uses two GitHub OIDC identities:
 
-- `AZURE_INFRA_CLIENT_ID` is provisioned by the `azure-bicep-configs` bootstrap and has subscription-level permissions for infrastructure deployment.
-- `AZURE_CLIENT_ID` is provisioned by this monorepo's infrastructure deployment and is used for application deployment.
+- `AZURE_INFRA_CLIENT_ID` is the app registration provisioned by the `azure-bicep-configs` bootstrap. It has subscription-level permissions and deploys infrastructure.
+- `AZURE_CLIENT_ID` is the app registration provisioned by this monorepo's infrastructure deployment. It is used only for application deployment and receives Reader plus Website Contributor on `rg-traceops-prod`.
+
+After the infrastructure deployment creates the app deployment identity, store the `appDeployClientId` output as the repository secret `AZURE_CLIENT_ID`.
 
 Deploy through GitHub Actions using OIDC. Required repository secrets:
 
@@ -175,6 +178,7 @@ Deploy through GitHub Actions using OIDC. Required repository secrets:
 
 The workload Bicep creates:
 
+- app deployment app registration and service principal
 - resource group
 - Azure Storage account
 - `WorkItems` table
