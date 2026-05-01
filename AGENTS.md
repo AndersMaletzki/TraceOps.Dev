@@ -2,23 +2,30 @@
 
 This file contains project-specific instructions for Codex and other AI coding agents.
 
-Fill this file out before asking Codex to build features.
-
 ---
 
 ## Project Summary
 
-TODO: Describe what this project is.
+TraceOps.Dev is an AI-native issue, feature, and audit tracking platform designed for AI agents and repository operations workflows.
 
-Example:
+The system acts as:
 
-This project is a SaaS application for tracking findings, issues, repositories, and technical debt.
+- Persistent workflow state
+- Issue tracking
+- Feature tracking
+- Audit finding tracking
+- Coordination layer for AI agents
+
+TraceOps.Dev is **not**:
+
+- A Git hosting platform
+- A CI/CD platform
+- A PR automation system
+- An autonomous coding system
 
 ---
 
 ## Repository Rules
-
-Suggested rules:
 
 - This repository is a monorepo.
 - Application code and infrastructure live in the same repository.
@@ -34,28 +41,20 @@ Suggested rules:
 
 ## Folder Structure
 
-Describe what each folder is responsible for.
-
-Example:
-
 ```text
-src/      Application code
-tests/    Automated tests
-infra/    Azure Bicep infrastructure
-docs/     Architecture and operational documentation
-scripts/  Local helper scripts
-seed/     Optional seed/test data
+.github/workflows/         CI/CD workflow definitions
+infra/github-identities/   Azure identities and OIDC-related infrastructure
+infra/workload/            Workload-specific Azure infrastructure (Bicep)
+docs/                      Architecture and operational documentation
 ```
 
 ---
 
 ## Infrastructure Rules
 
-Suggested rules:
-
 - Use `infra/github-identities/` for GitHub OIDC identities.
 - Use `infra/workload/` for workload-specific Azure resources.
-- Use Bicep modules under `infra/workload/modules/`.
+- Use Bicep modules under `infra/workload/modules/` when the project grows.
 - Keep parameters in parameter files.
 - Infrastructure should support PR what-if and main deployment.
 - Avoid manual Azure Portal configuration unless documented.
@@ -64,7 +63,7 @@ Suggested rules:
 
 ## GitHub Actions Rules
 
-Suggested workflow files:
+Expected workflow files:
 
 ```text
 .github/workflows/deploy-main.yml
@@ -83,8 +82,6 @@ Expected behavior:
 
 ## Security Rules
 
-Suggested rules:
-
 - Use GitHub OIDC for Azure authentication.
 - Use separate identities for infrastructure deployment and app deployment.
 - Prefer managed identities for Azure resource access.
@@ -95,8 +92,6 @@ Suggested rules:
 
 ## Coding Standards
 
-Suggested rules:
-
 - Keep code simple and readable.
 - Prefer explicit names.
 - Add tests for important behavior.
@@ -106,8 +101,6 @@ Suggested rules:
 ---
 
 ## What Codex Should Avoid
-
-Suggested rules:
 
 - Do not introduce Terraform.
 - Do not use Azure publish profiles.
