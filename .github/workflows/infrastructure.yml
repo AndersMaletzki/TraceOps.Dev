@@ -76,7 +76,6 @@ jobs:
           --location westeurope
           --template-file infra/github-identities/main.bicep
           --parameters
-          resourceGroupName=rg-traceops-prod
           environmentName=prod
           githubOwner=AndersMaletzki
           repositoryName=TraceOps.Dev
@@ -101,14 +100,15 @@ jobs:
             --location westeurope \
             --template-file infra/github-identities/main.bicep \
             --parameters \
-            resourceGroupName=rg-traceops-prod \
             environmentName=prod \
             githubOwner=AndersMaletzki \
             repositoryName=TraceOps.Dev
 
           outputs="$(az deployment sub show --name traceops-github-identities --query properties.outputs -o json)"
           app_deploy_client_id="$(echo "$outputs" | jq -r '.appDeployClientId.value')"
+          app_deploy_principal_object_id="$(echo "$outputs" | jq -r '.appDeployPrincipalObjectId.value')"
           echo "appDeployClientId=$app_deploy_client_id" >> "$GITHUB_OUTPUT"
+          echo "appDeployPrincipalObjectId=$app_deploy_principal_object_id" >> "$GITHUB_OUTPUT"
           echo "::notice title=AZURE_CLIENT_ID::Set repository secret AZURE_CLIENT_ID to $app_deploy_client_id before running app deployment."
 
       - name: Deploy
@@ -123,7 +123,8 @@ jobs:
             --parameters \
             resourceGroupName=rg-traceops-prod \
             environmentName=prod \
-            traceOpsApiKey='${{ secrets.TRACEOPS_API_KEY }}'
+            traceOpsApiKey='${{ secrets.TRACEOPS_API_KEY }}' \
+            appDeploymentPrincipalObjectId='${{ steps.identity_deploy.outputs.appDeployPrincipalObjectId }}'
 
           outputs="$(az deployment sub show --name traceops-workload --query properties.outputs -o json)"
           echo "functionAppName=$(echo "$outputs" | jq -r '.functionAppName.value')" >> "$GITHUB_OUTPUT"
