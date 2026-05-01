@@ -160,8 +160,14 @@ Validate Bicep:
 az bicep build --file infra/workload/main.bicep
 ```
 
+TraceOps.Dev uses two GitHub OIDC identities:
+
+- `AZURE_INFRA_CLIENT_ID` is provisioned by the `azure-bicep-configs` bootstrap and has subscription-level permissions for infrastructure deployment.
+- `AZURE_CLIENT_ID` is provisioned by this monorepo's infrastructure deployment and is used for application deployment.
+
 Deploy through GitHub Actions using OIDC. Required repository secrets:
 
+- `AZURE_INFRA_CLIENT_ID`
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`

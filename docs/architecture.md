@@ -134,6 +134,8 @@ Allowed statuses:
 
 ## Deployment
 
+TraceOps.Dev uses two GitHub OIDC identities. `AZURE_INFRA_CLIENT_ID` is provisioned by the `azure-bicep-configs` bootstrap and has subscription-level permissions for infrastructure deployment. `AZURE_CLIENT_ID` is provisioned by this monorepo's infrastructure deployment and is used for application deployment.
+
 Pull requests:
 
 ```text
