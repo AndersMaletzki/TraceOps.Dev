@@ -162,7 +162,8 @@ az bicep build --file infra/workload/main.bicep
 
 Deploy through GitHub Actions using OIDC. Required repository secrets:
 
-- `AZURE_CLIENT_ID`
+- `AZURE_INFRA_CLIENT_ID` for infrastructure validation and deployment
+- `AZURE_CLIENT_ID` for application deployment
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
 - `TRACEOPS_API_KEY`
