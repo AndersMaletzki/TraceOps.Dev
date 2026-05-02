@@ -71,15 +71,15 @@ v0.1 uses two Azure Table Storage tables:
 Work item keys:
 
 ```text
-PartitionKey = TENANT#<tenantId>#REPO#<repoId>
-RowKey       = ITEM#<yyyyMMddHHmmss>#<shortId>
+PartitionKey = TENANT~<base64url(tenantId)>~REPO~<base64url(repoId)>
+RowKey       = ITEM~<yyyyMMddHHmmss>~<shortId>
 ```
 
 Status event keys:
 
 ```text
-PartitionKey = TENANT#<tenantId>#REPO#<repoId>
-RowKey       = EVT#<yyyyMMddHHmmss>#<shortId>
+PartitionKey = TENANT~<base64url(tenantId)>~REPO~<base64url(repoId)>
+RowKey       = EVT~<yyyyMMddHHmmss>~<shortId>
 ```
 
 `workItemId` is the full work item RowKey. Clients treat it as opaque.

@@ -33,11 +33,11 @@ function newShortId(): string {
 }
 
 export function newWorkItemId(date = new Date()): string {
-  return `ITEM#${sortableTimestamp(date)}#${newShortId()}`;
+  return `ITEM~${sortableTimestamp(date)}~${newShortId()}`;
 }
 
 export function newEventId(date = new Date()): string {
-  return `EVT#${sortableTimestamp(date)}#${newShortId()}`;
+  return `EVT~${sortableTimestamp(date)}~${newShortId()}`;
 }
 
 export function matchesFilters(workItem: WorkItem, filters: Omit<WorkItemFilters, "tenantId" | "repoId" | "limit">): boolean {

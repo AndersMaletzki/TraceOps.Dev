@@ -19,14 +19,19 @@ describe("storage mapping", () => {
         tags: ["audit"],
         createdBy: "codex"
       },
-      "ITEM#20260501153000#abc123",
+      "ITEM~20260501153000~abc123",
       "2026-05-01T15:30:00.000Z"
     );
 
     expect(stored.partitionKey).toBe(partitionKey("tenant", "repo"));
-    expect(stored.rowKey).toBe("ITEM#20260501153000#abc123");
+    expect(stored.partitionKey).toBe("TENANT~dGVuYW50~REPO~cmVwbw");
+    expect(stored.rowKey).toBe("ITEM~20260501153000~abc123");
     expect(stored.files).toBe("[\"docs/architecture.md\"]");
     expect(toWorkItem(stored).files).toEqual(["docs/architecture.md"]);
     expect(toWorkItem(stored).tags).toEqual(["audit"]);
+  });
+
+  it("creates Azure Table-safe partition keys", () => {
+    expect(partitionKey("tenant/#?", "owner/repo#main?")).not.toMatch(/[\\/#?\u0000-\u001F\u007F-\u009F]/);
   });
 });

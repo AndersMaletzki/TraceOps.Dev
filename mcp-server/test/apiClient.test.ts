@@ -39,7 +39,7 @@ describe("TraceOpsApiClient", () => {
     const fetchMock = vi.fn(async () => {
       return new Response(
         JSON.stringify({
-          workItemId: "ITEM#1",
+          workItemId: "ITEM~1",
           workItemType: "Issue",
           category: "Bug",
           title: "Bug",
@@ -61,7 +61,7 @@ describe("TraceOpsApiClient", () => {
     await client.updateWorkItemLinks({
       tenantId: "tenant",
       repoId: "repo",
-      workItemId: "ITEM#1",
+      workItemId: "ITEM~1",
       externalBranchName: "codex/test"
     });
 
@@ -69,7 +69,7 @@ describe("TraceOpsApiClient", () => {
       URL | RequestInfo,
       RequestInit | undefined
     ];
-    expect(String(url)).toBe("http://localhost:7071/api/workitems/ITEM%231/links");
+    expect(String(url)).toBe("http://localhost:7071/api/workitems/ITEM~1/links");
     expect(JSON.parse(String(init?.body))).toEqual({
       tenantId: "tenant",
       repoId: "repo",

@@ -20,7 +20,7 @@ const createInput: CreateWorkItemInput = {
 
 function createStored(overrides: Partial<StoredWorkItemResult> = {}): StoredWorkItemResult {
   return {
-    ...toStoredWorkItem(createInput, "ITEM#20260501153000#abc123", "2026-05-01T15:30:00.000Z"),
+  ...toStoredWorkItem(createInput, "ITEM~20260501153000~abc123", "2026-05-01T15:30:00.000Z"),
     etag: "etag",
     ...overrides
   };
@@ -37,7 +37,7 @@ describe("WorkItemService", () => {
     } as unknown as WorkItemRepository;
 
     const service = new WorkItemService(repository);
-    const updated = await service.updateStatus("ITEM#20260501153000#abc123", {
+    const updated = await service.updateStatus("ITEM~20260501153000~abc123", {
       tenantId: "tenant",
       repoId: "repo",
       status: "InProgress",
@@ -47,7 +47,7 @@ describe("WorkItemService", () => {
     expect(updated.status).toBe("InProgress");
     expect(createEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        workItemId: "ITEM#20260501153000#abc123",
+        workItemId: "ITEM~20260501153000~abc123",
         previousStatus: "New",
         newStatus: "InProgress",
         actor: "codex"
@@ -68,7 +68,7 @@ describe("WorkItemService", () => {
     const service = new WorkItemService(repository);
 
     await expect(
-      service.claim("ITEM#20260501153000#abc123", {
+      service.claim("ITEM~20260501153000~abc123", {
         tenantId: "tenant",
         repoId: "repo",
         claimedBy: "codex"
@@ -87,7 +87,7 @@ describe("WorkItemService", () => {
     } as unknown as WorkItemRepository;
 
     const service = new WorkItemService(repository);
-    const updated = await service.claim("ITEM#20260501153000#abc123", {
+    const updated = await service.claim("ITEM~20260501153000~abc123", {
       tenantId: "tenant",
       repoId: "repo",
       claimedBy: "codex"

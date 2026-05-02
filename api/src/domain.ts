@@ -124,6 +124,10 @@ export const severityRank: Record<WorkItemSeverity, number> = {
   Info: 4
 };
 
+function tableKeySegment(value: string): string {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
 export function partitionKey(tenantId: string, repoId: string): string {
-  return `TENANT#${tenantId}#REPO#${repoId}`;
+  return `TENANT~${tableKeySegment(tenantId)}~REPO~${tableKeySegment(repoId)}`;
 }

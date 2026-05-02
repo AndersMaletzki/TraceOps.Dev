@@ -95,7 +95,7 @@ curl -sS 'http://localhost:7071/api/workitems/next?tenantId=demo-tenant&repoId=t
 Claim an item:
 
 ```bash
-curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM%2320260501153000%23abc123def0/claim' \
+curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/claim' \
   -H 'content-type: application/json' \
   -H 'x-api-key: local-dev-key' \
   --data @scripts/examples/claim-workitem.json
@@ -104,7 +104,7 @@ curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM%2320260501153000%23a
 Update status:
 
 ```bash
-curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM%2320260501153000%23abc123def0/status' \
+curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/status' \
   -H 'content-type: application/json' \
   -H 'x-api-key: local-dev-key' \
   --data '{"tenantId":"demo-tenant","repoId":"traceops-dev","status":"InProgress","actor":"codex"}'
@@ -113,7 +113,7 @@ curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM%2320260501153000%23a
 Store external metadata:
 
 ```bash
-curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM%2320260501153000%23abc123def0/links' \
+curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/links' \
   -H 'content-type: application/json' \
   -H 'x-api-key: local-dev-key' \
   --data @scripts/examples/update-links.json
@@ -191,13 +191,13 @@ The workload Bicep creates:
 Work items are stored in Azure Table Storage:
 
 ```text
-PartitionKey = TENANT#<tenantId>#REPO#<repoId>
-RowKey       = ITEM#<yyyyMMddHHmmss>#<shortId>
+PartitionKey = TENANT~<base64url(tenantId)>~REPO~<base64url(repoId)>
+RowKey       = ITEM~<yyyyMMddHHmmss>~<shortId>
 ```
 
 Status events are append-only:
 
 ```text
-PartitionKey = TENANT#<tenantId>#REPO#<repoId>
-RowKey       = EVT#<yyyyMMddHHmmss>#<shortId>
+PartitionKey = TENANT~<base64url(tenantId)>~REPO~<base64url(repoId)>
+RowKey       = EVT~<yyyyMMddHHmmss>~<shortId>
 ```
