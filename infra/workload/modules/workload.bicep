@@ -19,10 +19,11 @@ param workItemEventsTableName string = 'WorkItemEvents'
 var suffix = take(uniqueString(subscription().id, resourceGroup().id, environmentName), 6)
 var normalizedEnvironmentName = toLower(replace(environmentName, '-', ''))
 var storageAccountName = take('sttraceops${normalizedEnvironmentName}${suffix}', 24)
-var functionAppName = 'func-traceops-${environmentName}-${suffix}'
-var appServicePlanName = 'asp-traceops-${environmentName}-${suffix}'
+var functionAppName = 'func-traceops-${environmentName}-flex-${suffix}'
+var appServicePlanName = 'asp-traceops-${environmentName}-flex-${suffix}'
 var logAnalyticsName = 'log-traceops-${environmentName}-${suffix}'
 var appInsightsName = 'appi-traceops-${environmentName}-${suffix}'
+var deploymentStorageContainerName = 'func-traceops-${normalizedEnvironmentName}-${suffix}-packages'
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
@@ -43,6 +44,19 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-01' = {
   name: 'default'
   parent: storageAccount
+}
+
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  name: 'default'
+  parent: storageAccount
+}
+
+resource deploymentStorageContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  name: deploymentStorageContainerName
+  parent: blobService
+  properties: {
+    publicAccess: 'None'
+  }
 }
 
 resource workItemsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
@@ -76,12 +90,12 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   }
 }
 
-resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
+resource appServicePlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: appServicePlanName
   location: location
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'FC1'
+    tier: 'FlexConsumption'
   }
   kind: 'functionapp'
   properties: {
@@ -89,7 +103,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   }
 }
 
-resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
+resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   name: functionAppName
   location: location
   kind: 'functionapp,linux'
@@ -99,8 +113,27 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${storageAccount.properties.primaryEndpoints.blob}${deploymentStorageContainerName}'
+          authentication: {
+            type: 'StorageAccountConnectionString'
+            storageAccountConnectionStringName: 'DEPLOYMENT_STORAGE_CONNECTION_STRING'
+          }
+        }
+      }
+      runtime: {
+        name: 'node'
+        version: '20'
+      }
+      scaleAndConcurrency: {
+        instanceMemoryMB: 512
+        maximumInstanceCount: 20
+      }
+    }
     siteConfig: {
-      linuxFxVersion: 'NODE|20'
       appSettings: [
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
@@ -112,6 +145,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'AzureWebJobsStorage'
+          value: storageConnectionString
+        }
+        {
+          name: 'DEPLOYMENT_STORAGE_CONNECTION_STRING'
           value: storageConnectionString
         }
         {
@@ -134,14 +171,11 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsights.properties.ConnectionString
         }
-        {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '1'
-        }
       ]
     }
   }
   dependsOn: [
+    deploymentStorageContainer
     workItemsTable
     workItemEventsTable
   ]
