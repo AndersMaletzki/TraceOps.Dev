@@ -6,7 +6,7 @@ TraceOps.Dev now deploys the API to Azure Functions Flex Consumption instead of 
 
 - The workload Bicep creates a new Flex Consumption App Service plan with `FC1` / `FlexConsumption`.
 - The workload Bicep creates a new Linux Function App named with the pattern `func-traceops-<environment>-flex-<suffix>`.
-- Runtime configuration moved from `linuxFxVersion` to `properties.functionAppConfig.runtime`.
+- Runtime configuration moved from `linuxFxVersion`, `FUNCTIONS_WORKER_RUNTIME`, and `FUNCTIONS_EXTENSION_VERSION` to `properties.functionAppConfig.runtime`.
 - Scale configuration is set in `properties.functionAppConfig.scaleAndConcurrency` with the lowest Flex Consumption instance memory, 512 MB, and a conservative maximum instance count of 20.
 - A blob deployment container is created in the existing TraceOps storage account for Flex Consumption One Deploy packages.
 - `WEBSITE_RUN_FROM_PACKAGE` is no longer configured because Flex Consumption uses One Deploy.
@@ -35,7 +35,7 @@ TraceOps.Dev now deploys the API to Azure Functions Flex Consumption instead of 
   - Runtime `node` version `20` under Flex application configuration.
   - Instance memory `512` MB under scale and concurrency.
   - App settings for `TRACEOPS_API_KEY`, `TRACEOPS_STORAGE_CONNECTION_STRING`, `TRACEOPS_TABLE_WORKITEMS`, `TRACEOPS_TABLE_WORKITEM_EVENTS`, and `APPLICATIONINSIGHTS_CONNECTION_STRING`.
-  - No `WEBSITE_RUN_FROM_PACKAGE` app setting.
+  - No `WEBSITE_RUN_FROM_PACKAGE`, `FUNCTIONS_WORKER_RUNTIME`, or `FUNCTIONS_EXTENSION_VERSION` app settings.
 - Exercise the existing API routes and confirm records are read from and written to the existing TraceOps tables.
 
 ## Manual cleanup
