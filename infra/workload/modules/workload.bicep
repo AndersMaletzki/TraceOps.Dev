@@ -6,7 +6,7 @@ param location string = resourceGroup().location
 @description('Deployment environment name.')
 param environmentName string = 'prod'
 
-@description('API key used by the Function App.')
+@description('Lowercase SHA-256 hex API key value used by the Function App.')
 @secure()
 param traceOpsApiKey string
 

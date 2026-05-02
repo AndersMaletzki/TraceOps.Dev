@@ -3,7 +3,7 @@
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "node",
-    "TRACEOPS_API_KEY": "local-dev-key",
+    "TRACEOPS_API_KEY": "ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c",
     "TRACEOPS_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
     "TRACEOPS_TABLE_WORKITEMS": "WorkItems",
     "TRACEOPS_TABLE_WORKITEM_EVENTS": "WorkItemEvents"

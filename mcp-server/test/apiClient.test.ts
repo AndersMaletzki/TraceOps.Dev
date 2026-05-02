@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { TraceOpsApiClient } from "../src/apiClient.js";
 
+const testApiKeyHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
 describe("TraceOpsApiClient", () => {
   it("shapes search requests with tenant, repo, filters, limit, and API key", async () => {
     const fetchMock = vi.fn(async () => {
@@ -10,7 +12,7 @@ describe("TraceOpsApiClient", () => {
       });
     });
 
-    const client = new TraceOpsApiClient("http://localhost:7071/api", "test-key", fetchMock as unknown as typeof fetch);
+    const client = new TraceOpsApiClient("http://localhost:7071/api", testApiKeyHash, fetchMock as unknown as typeof fetch);
     await client.searchWorkItems({
       tenantId: "tenant",
       repoId: "repo",
@@ -30,7 +32,7 @@ describe("TraceOpsApiClient", () => {
     expect(init).toMatchObject({
       method: "GET",
       headers: expect.objectContaining({
-        "x-api-key": "test-key"
+        "x-api-key": testApiKeyHash
       })
     });
   });
@@ -57,7 +59,7 @@ describe("TraceOpsApiClient", () => {
       );
     });
 
-    const client = new TraceOpsApiClient("http://localhost:7071/api", "test-key", fetchMock as unknown as typeof fetch);
+    const client = new TraceOpsApiClient("http://localhost:7071/api", testApiKeyHash, fetchMock as unknown as typeof fetch);
     await client.updateWorkItemLinks({
       tenantId: "tenant",
       repoId: "repo",

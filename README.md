@@ -38,7 +38,7 @@ docs/             Architecture docs
 API:
 
 ```bash
-export TRACEOPS_API_KEY='local-dev-key'
+export TRACEOPS_API_KEY='ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c'
 export TRACEOPS_STORAGE_CONNECTION_STRING='UseDevelopmentStorage=true'
 export TRACEOPS_TABLE_WORKITEMS='WorkItems'
 export TRACEOPS_TABLE_WORKITEM_EVENTS='WorkItemEvents'
@@ -48,8 +48,10 @@ MCP server:
 
 ```bash
 export TRACEOPS_API_BASE_URL='http://localhost:7071/api'
-export TRACEOPS_API_KEY='local-dev-key'
+export TRACEOPS_API_KEY='ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c'
 ```
+
+`TRACEOPS_API_KEY` is a lowercase SHA-256 hex bearer value. The local example value above is the SHA-256 hash of `local-dev-key`.
 
 ## Local Setup
 
@@ -74,7 +76,7 @@ Create a work item:
 ```bash
 curl -sS -X POST 'http://localhost:7071/api/workitems' \
   -H 'content-type: application/json' \
-  -H 'x-api-key: local-dev-key' \
+  -H 'x-api-key: ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c' \
   --data @scripts/examples/create-security-issue.json
 ```
 
@@ -82,14 +84,14 @@ Search work items:
 
 ```bash
 curl -sS 'http://localhost:7071/api/workitems?tenantId=demo-tenant&repoId=traceops-dev&limit=10' \
-  -H 'x-api-key: local-dev-key'
+  -H 'x-api-key: ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c'
 ```
 
 Get the next actionable item:
 
 ```bash
 curl -sS 'http://localhost:7071/api/workitems/next?tenantId=demo-tenant&repoId=traceops-dev' \
-  -H 'x-api-key: local-dev-key'
+  -H 'x-api-key: ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c'
 ```
 
 Claim an item:
@@ -97,7 +99,7 @@ Claim an item:
 ```bash
 curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/claim' \
   -H 'content-type: application/json' \
-  -H 'x-api-key: local-dev-key' \
+  -H 'x-api-key: ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c' \
   --data @scripts/examples/claim-workitem.json
 ```
 
@@ -106,7 +108,7 @@ Update status:
 ```bash
 curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/status' \
   -H 'content-type: application/json' \
-  -H 'x-api-key: local-dev-key' \
+  -H 'x-api-key: ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c' \
   --data '{"tenantId":"demo-tenant","repoId":"traceops-dev","status":"InProgress","actor":"codex"}'
 ```
 
@@ -115,7 +117,7 @@ Store external metadata:
 ```bash
 curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/links' \
   -H 'content-type: application/json' \
-  -H 'x-api-key: local-dev-key' \
+  -H 'x-api-key: ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c' \
   --data @scripts/examples/update-links.json
 ```
 
@@ -133,7 +135,7 @@ Example Codex/Claude MCP config:
       "args": ["/absolute/path/to/TraceOps.Dev/mcp-server/dist/server.js"],
       "env": {
         "TRACEOPS_API_BASE_URL": "http://localhost:7071/api",
-        "TRACEOPS_API_KEY": "local-dev-key"
+        "TRACEOPS_API_KEY": "ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c"
       }
     }
   }
@@ -174,7 +176,7 @@ Deploy through GitHub Actions using OIDC. Required repository secrets:
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
-- `TRACEOPS_API_KEY`
+- `TRACEOPS_API_KEY` as a lowercase SHA-256 hex value
 
 The workload Bicep creates:
 

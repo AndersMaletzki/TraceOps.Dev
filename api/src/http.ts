@@ -1,4 +1,5 @@
 import { HttpRequest, HttpResponseInit } from "@azure/functions";
+import { apiKeysMatch } from "./apiKey.js";
 import { TraceOpsConfig } from "./config.js";
 import {
   parseCategory,
@@ -30,7 +31,7 @@ export function json(status: number, body: unknown): HttpResponseInit {
 export function authenticate(request: HttpRequest, config: TraceOpsConfig): HttpResponseInit | undefined {
   const suppliedApiKey = request.headers.get("x-api-key");
 
-  if (!suppliedApiKey || suppliedApiKey !== config.apiKey) {
+  if (!suppliedApiKey || !apiKeysMatch(suppliedApiKey, config.apiKey)) {
     return json(401, { error: "Unauthorized" });
   }
 
