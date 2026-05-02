@@ -20,7 +20,27 @@ type StoredWorkItemEvent = WorkItemEvent & {
   rowKey: string;
 };
 
-export type StoredWorkItemResult = StoredWorkItem & {
+export type StoredWorkItemResult = Partial<StoredWorkItem> &
+  Pick<
+    StoredWorkItem,
+    | "partitionKey"
+    | "rowKey"
+    | "tenantId"
+    | "repoId"
+    | "workItemId"
+    | "workItemType"
+    | "category"
+    | "title"
+    | "description"
+    | "severity"
+    | "status"
+    | "source"
+    | "files"
+    | "tags"
+    | "createdAt"
+    | "updatedAt"
+    | "createdBy"
+  > & {
   etag?: string;
 };
 
@@ -54,13 +74,13 @@ export function toWorkItem(entity: StoredWorkItemResult): WorkItem {
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
     createdBy: entity.createdBy,
-    assignedTo: entity.assignedTo,
-    claimedBy: entity.claimedBy,
-    claimedAt: entity.claimedAt,
-    claimExpiresAt: entity.claimExpiresAt,
-    externalBranchName: entity.externalBranchName,
-    externalCommitUrl: entity.externalCommitUrl,
-    externalPrUrl: entity.externalPrUrl
+    assignedTo: entity.assignedTo || "",
+    claimedBy: entity.claimedBy || "",
+    claimedAt: entity.claimedAt || "",
+    claimExpiresAt: entity.claimExpiresAt || "",
+    externalBranchName: entity.externalBranchName || "",
+    externalCommitUrl: entity.externalCommitUrl || "",
+    externalPrUrl: entity.externalPrUrl || ""
   };
 }
 

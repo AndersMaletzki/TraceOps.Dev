@@ -1,4 +1,4 @@
-export const workItemTypes = ["Issue", "Feature"] as const;
+export const workItemTypes = ["Issue", "Feature", "AuditFinding"] as const;
 export const workItemCategories = [
   "Security",
   "Bug",
@@ -53,3 +53,48 @@ export type WorkItem = WorkItemSummary & {
   createdBy: string;
   claimedAt: string;
 };
+
+type WorkItemEventBase = {
+  tenantId: string;
+  repoId: string;
+  workItemId: string;
+  eventId: string;
+  actor?: string;
+  createdAt: string;
+};
+
+export type WorkItemEvent =
+  | (WorkItemEventBase & {
+      eventType: "Created";
+      workItemType: WorkItemType;
+      status: WorkItemStatus;
+    })
+  | (WorkItemEventBase & {
+      eventType: "StatusChanged";
+      previousStatus: WorkItemStatus;
+      newStatus: WorkItemStatus;
+      actor: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "Claimed";
+      claimedBy: string;
+      claimExpiresAt: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "Released";
+      releasedBy: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "LinksUpdated";
+      externalBranchName: string;
+      externalCommitUrl: string;
+      externalPrUrl: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "Assigned";
+      assignedTo: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "CommentAdded";
+      comment: string;
+    });

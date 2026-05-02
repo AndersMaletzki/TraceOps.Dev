@@ -71,7 +71,7 @@ npm run dev:mcp
 
 ## API Examples
 
-Create a work item:
+Create an audit finding:
 
 ```bash
 curl -sS -X POST 'http://localhost:7071/api/workitems' \
@@ -197,9 +197,82 @@ PartitionKey = TENANT~<base64url(tenantId)>~REPO~<base64url(repoId)>
 RowKey       = ITEM~<yyyyMMddHHmmss>~<shortId>
 ```
 
-Status events are append-only:
+`workItemId` is the full work item RowKey. Clients treat it as opaque.
+
+Work item fields:
+
+- `tenantId`
+- `repoId`
+- `workItemId`
+- `workItemType`
+- `category`
+- `severity`
+- `status`
+- `title`
+- `description`
+- `source`
+- `files`
+- `tags`
+- `createdAt`
+- `updatedAt`
+- `createdBy`
+- `assignedTo`
+- `claimedBy`
+- `claimedAt`
+- `claimExpiresAt`
+- `externalBranchName`
+- `externalCommitUrl`
+- `externalPrUrl`
+
+Allowed work item types:
+
+- `Issue`
+- `Feature`
+- `AuditFinding`
+
+Allowed categories:
+
+- `Security`
+- `Bug`
+- `Infra`
+- `Refactor`
+- `Documentation`
+- `Performance`
+- `TechnicalDebt`
+- `Idea`
+
+Allowed severities:
+
+- `Critical`
+- `High`
+- `Medium`
+- `Low`
+- `Info`
+
+Allowed statuses:
+
+- `New`
+- `Accepted`
+- `Claimed`
+- `InProgress`
+- `InReview`
+- `Fixed`
+- `Closed`
+- `WontFix`
+
+Work item events are append-only:
 
 ```text
 PartitionKey = TENANT~<base64url(tenantId)>~REPO~<base64url(repoId)>
 RowKey       = EVT~<yyyyMMddHHmmss>~<shortId>
 ```
+
+Event types:
+
+- `Created`
+- `StatusChanged`
+- `Claimed`
+- `Released`
+- `LinksUpdated`
+- `Assigned`
+- `CommentAdded`

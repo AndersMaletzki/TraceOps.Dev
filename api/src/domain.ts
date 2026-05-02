@@ -1,4 +1,4 @@
-export const workItemTypes = ["Issue", "Feature"] as const;
+export const workItemTypes = ["Issue", "Feature", "AuditFinding"] as const;
 export type WorkItemType = (typeof workItemTypes)[number];
 
 export const workItemCategories = [
@@ -104,17 +104,50 @@ export type UpdateLinksInput = {
   externalPrUrl?: string;
 };
 
-export type WorkItemEvent = {
+type WorkItemEventBase = {
   tenantId: string;
   repoId: string;
   workItemId: string;
   eventId: string;
-  eventType: "StatusChanged";
-  previousStatus: WorkItemStatus;
-  newStatus: WorkItemStatus;
-  actor: string;
+  actor?: string;
   createdAt: string;
 };
+
+export type WorkItemEvent =
+  | (WorkItemEventBase & {
+      eventType: "Created";
+      workItemType: WorkItemType;
+      status: WorkItemStatus;
+    })
+  | (WorkItemEventBase & {
+      eventType: "StatusChanged";
+      previousStatus: WorkItemStatus;
+      newStatus: WorkItemStatus;
+      actor: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "Claimed";
+      claimedBy: string;
+      claimExpiresAt: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "Released";
+      releasedBy: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "LinksUpdated";
+      externalBranchName: string;
+      externalCommitUrl: string;
+      externalPrUrl: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "Assigned";
+      assignedTo: string;
+    })
+  | (WorkItemEventBase & {
+      eventType: "CommentAdded";
+      comment: string;
+    });
 
 export const severityRank: Record<WorkItemSeverity, number> = {
   Critical: 0,

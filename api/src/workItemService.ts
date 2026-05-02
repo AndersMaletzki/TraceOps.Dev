@@ -80,12 +80,57 @@ export function buildStatusChangedEvent(
   };
 }
 
+export function buildCreatedEvent(workItem: WorkItem, now: string, eventId: string): WorkItemEvent {
+  return {
+    tenantId: workItem.tenantId,
+    repoId: workItem.repoId,
+    workItemId: workItem.workItemId,
+    eventId,
+    eventType: "Created",
+    workItemType: workItem.workItemType,
+    status: workItem.status,
+    actor: workItem.createdBy,
+    createdAt: now
+  };
+}
+
+export function buildClaimedEvent(workItem: WorkItem, now: string, eventId: string): WorkItemEvent {
+  return {
+    tenantId: workItem.tenantId,
+    repoId: workItem.repoId,
+    workItemId: workItem.workItemId,
+    eventId,
+    eventType: "Claimed",
+    claimedBy: workItem.claimedBy,
+    claimExpiresAt: workItem.claimExpiresAt,
+    actor: workItem.claimedBy,
+    createdAt: now
+  };
+}
+
+export function buildLinksUpdatedEvent(workItem: WorkItem, now: string, eventId: string): WorkItemEvent {
+  return {
+    tenantId: workItem.tenantId,
+    repoId: workItem.repoId,
+    workItemId: workItem.workItemId,
+    eventId,
+    eventType: "LinksUpdated",
+    externalBranchName: workItem.externalBranchName,
+    externalCommitUrl: workItem.externalCommitUrl,
+    externalPrUrl: workItem.externalPrUrl,
+    createdAt: now
+  };
+}
+
 export class WorkItemService {
   constructor(private readonly repository: WorkItemRepository) {}
 
   async create(input: CreateWorkItemInput): Promise<WorkItem> {
     const now = isoNow();
-    return this.repository.createWorkItem(toStoredWorkItem(input, newWorkItemId(), now));
+    const workItem = await this.repository.createWorkItem(toStoredWorkItem(input, newWorkItemId(), now));
+    await this.repository.createEvent(buildCreatedEvent(workItem, now, newEventId()));
+
+    return workItem;
   }
 
   async list(filters: WorkItemFilters): Promise<WorkItem[]> {
@@ -145,17 +190,26 @@ export class WorkItemService {
     const durationMinutes = input.claimDurationMinutes || 60;
     const claimExpiresAt = new Date(nowDate.getTime() + durationMinutes * 60_000).toISOString();
 
-    return this.repository.replaceWorkItem({
+    const updatedWorkItem = await this.repository.replaceWorkItem({
       ...entity,
       claimedBy: input.claimedBy,
       claimedAt: now,
       claimExpiresAt,
       updatedAt: now
     });
+
+    await this.repository.createEvent(buildClaimedEvent(updatedWorkItem, now, newEventId()));
+
+    return updatedWorkItem;
   }
 
   async updateLinks(workItemId: string, input: UpdateLinksInput): Promise<WorkItem> {
     const entity = await this.repository.getWorkItem(input.tenantId, input.repoId, workItemId);
-    return this.repository.replaceWorkItem(applyLinks(entity, input, isoNow()));
+    const now = isoNow();
+    const updatedWorkItem = await this.repository.replaceWorkItem(applyLinks(entity, input, now));
+
+    await this.repository.createEvent(buildLinksUpdatedEvent(updatedWorkItem, now, newEventId()));
+
+    return updatedWorkItem;
   }
 }

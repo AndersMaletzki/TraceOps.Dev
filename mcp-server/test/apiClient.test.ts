@@ -18,6 +18,7 @@ describe("TraceOpsApiClient", () => {
       repoId: "repo",
       status: "New",
       severity: "High",
+      workItemType: "AuditFinding",
       limit: 10
     });
 
@@ -27,7 +28,7 @@ describe("TraceOpsApiClient", () => {
       RequestInit | undefined
     ];
     expect(String(url)).toBe(
-      "http://localhost:7071/api/workitems?tenantId=tenant&repoId=repo&status=New&severity=High&limit=10"
+      "http://localhost:7071/api/workitems?tenantId=tenant&repoId=repo&status=New&severity=High&workItemType=AuditFinding&limit=10"
     );
     expect(init).toMatchObject({
       method: "GET",

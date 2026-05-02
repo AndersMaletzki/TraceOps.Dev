@@ -75,7 +75,7 @@ PartitionKey = TENANT~<base64url(tenantId)>~REPO~<base64url(repoId)>
 RowKey       = ITEM~<yyyyMMddHHmmss>~<shortId>
 ```
 
-Status event keys:
+Work item event keys:
 
 ```text
 PartitionKey = TENANT~<base64url(tenantId)>~REPO~<base64url(repoId)>
@@ -88,10 +88,36 @@ RowKey       = EVT~<yyyyMMddHHmmss>~<shortId>
 
 ## Work Item Contract
 
+Work item fields:
+
+- `tenantId`
+- `repoId`
+- `workItemId`
+- `workItemType`
+- `category`
+- `severity`
+- `status`
+- `title`
+- `description`
+- `source`
+- `files`
+- `tags`
+- `createdAt`
+- `updatedAt`
+- `createdBy`
+- `assignedTo`
+- `claimedBy`
+- `claimedAt`
+- `claimExpiresAt`
+- `externalBranchName`
+- `externalCommitUrl`
+- `externalPrUrl`
+
 Allowed work item types:
 
 - `Issue`
 - `Feature`
+- `AuditFinding`
 
 Allowed categories:
 
@@ -123,11 +149,21 @@ Allowed statuses:
 - `Closed`
 - `WontFix`
 
+Append-only event types:
+
+- `Created`
+- `StatusChanged`
+- `Claimed`
+- `Released`
+- `LinksUpdated`
+- `Assigned`
+- `CommentAdded`
+
 ## Coordination Rules
 
 - `GET /workitems` defaults `limit` to `10` and caps it at `50`.
 - `GET /workitems/next` defaults to `New` and `Accepted` items, sorted by severity then oldest created time.
-- Status updates write append-only `WorkItemEvents` records.
+- Create, status update, claim, and link update operations write append-only `WorkItemEvents` records.
 - Claims record `claimedBy`, `claimedAt`, and `claimExpiresAt`.
 - Active unexpired claims by another claimant return `409 Conflict`.
 - Link updates store only external branch, commit, and PR metadata.

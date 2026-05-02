@@ -34,4 +34,40 @@ describe("storage mapping", () => {
   it("creates Azure Table-safe partition keys", () => {
     expect(partitionKey("tenant/#?", "owner/repo#main?")).not.toMatch(/[\\/#?\u0000-\u001F\u007F-\u009F]/);
   });
+
+  it("maps missing optional stored fields to stable API defaults", () => {
+    const stored = toStoredWorkItem(
+      {
+        tenantId: "tenant",
+        repoId: "repo",
+        workItemType: "AuditFinding",
+        category: "Security",
+        title: "Missing auth",
+        description: "Endpoint needs auth.",
+        severity: "High",
+        source: "repo-audit",
+        createdBy: "codex"
+      },
+      "ITEM~20260501153000~abc123",
+      "2026-05-01T15:30:00.000Z"
+    );
+
+    delete stored.assignedTo;
+    delete stored.claimedBy;
+    delete stored.claimedAt;
+    delete stored.claimExpiresAt;
+    delete stored.externalBranchName;
+    delete stored.externalCommitUrl;
+    delete stored.externalPrUrl;
+
+    expect(toWorkItem(stored)).toMatchObject({
+      assignedTo: "",
+      claimedBy: "",
+      claimedAt: "",
+      claimExpiresAt: "",
+      externalBranchName: "",
+      externalCommitUrl: "",
+      externalPrUrl: ""
+    });
+  });
 });
