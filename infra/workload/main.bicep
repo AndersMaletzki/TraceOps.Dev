@@ -9,7 +9,7 @@ param resourceGroupName string = 'rg-traceops-prod'
 @description('Deployment environment name.')
 param environmentName string = 'prod'
 
-@description('Lowercase SHA-256 hex API key value used by the Function App. Store the value in GitHub Secrets or Key Vault.')
+@description('Lowercase SHA-256 hex API key hash used by the Function App. Store the hash in GitHub Secrets or Key Vault.')
 @secure()
 param traceOpsApiKey string
 

@@ -35,7 +35,7 @@ TraceOps.Dev now deploys the API to Azure Functions Flex Consumption instead of 
   - Hosting plan SKU `FC1` / `FlexConsumption`.
   - Runtime `node` version `20` under Flex application configuration.
   - Instance memory `512` MB under scale and concurrency.
-  - App settings for `TRACEOPS_API_KEY` as a lowercase SHA-256 hex value, `TRACEOPS_STORAGE_CONNECTION_STRING`, `TRACEOPS_TABLE_WORKITEMS`, `TRACEOPS_TABLE_WORKITEM_EVENTS`, and `APPLICATIONINSIGHTS_CONNECTION_STRING`.
+  - App settings for `TRACEOPS_API_KEY` as a lowercase SHA-256 hash value, `TRACEOPS_STORAGE_CONNECTION_STRING`, `TRACEOPS_TABLE_WORKITEMS`, `TRACEOPS_TABLE_WORKITEM_EVENTS`, and `APPLICATIONINSIGHTS_CONNECTION_STRING`.
   - No `WEBSITE_RUN_FROM_PACKAGE`, `FUNCTIONS_WORKER_RUNTIME`, or `FUNCTIONS_EXTENSION_VERSION` app settings.
 - Exercise the existing API routes and confirm records are read from and written to the existing TraceOps tables.
 

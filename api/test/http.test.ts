@@ -22,14 +22,14 @@ function configWithApiKey(apiKey: string): TraceOpsConfig {
 }
 
 describe("authenticate", () => {
-  it("accepts a matching SHA-256 API key value", () => {
-    const response = authenticate(requestWithApiKey(localDevKeyHash), configWithApiKey(localDevKeyHash));
+  it("accepts a matching raw API key value", () => {
+    const response = authenticate(requestWithApiKey("local-dev-key"), configWithApiKey(localDevKeyHash));
 
     expect(response).toBeUndefined();
   });
 
-  it("rejects the old raw API key value", () => {
-    const response = authenticate(requestWithApiKey("local-dev-key"), configWithApiKey(localDevKeyHash));
+  it("rejects the stored SHA-256 API key value as a request key", () => {
+    const response = authenticate(requestWithApiKey(localDevKeyHash), configWithApiKey(localDevKeyHash));
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });
@@ -41,13 +41,13 @@ describe("authenticate", () => {
   });
 
   it("rejects an incorrect SHA-256 API key value", () => {
-    const response = authenticate(requestWithApiKey(otherHash), configWithApiKey(localDevKeyHash));
+    const response = authenticate(requestWithApiKey("wrong-key"), configWithApiKey(localDevKeyHash));
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });
 
-  it("rejects malformed non-SHA-256 API key values", () => {
-    const response = authenticate(requestWithApiKey("not-a-sha-256-value"), configWithApiKey(localDevKeyHash));
+  it("rejects when the configured API key is not a SHA-256 hash", () => {
+    const response = authenticate(requestWithApiKey("local-dev-key"), configWithApiKey("not-a-sha-256-value"));
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });

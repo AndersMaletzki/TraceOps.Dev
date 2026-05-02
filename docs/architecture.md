@@ -47,7 +47,7 @@ TraceOps.Dev v0.1 does not support:
 
 ## API
 
-All endpoints require `x-api-key`, matched against `TRACEOPS_API_KEY`. The value must be a lowercase SHA-256 hex bearer value, not the original raw secret.
+All endpoints require `x-api-key`. `TRACEOPS_API_KEY` stores the lowercase SHA-256 hash of the API key, and clients send the raw API key as the bearer value. The API hashes the incoming key before comparing.
 
 ```text
 POST  /workitems

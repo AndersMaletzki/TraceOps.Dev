@@ -1,5 +1,3 @@
-import { requireSha256Hex } from "./apiKey.js";
-
 export type TraceOpsMcpConfig = {
   apiBaseUrl: string;
   apiKey: string;
@@ -19,6 +17,6 @@ export function getConfig(env: NodeJS.ProcessEnv = process.env): TraceOpsMcpConf
 
   return {
     apiBaseUrl,
-    apiKey: requireSha256Hex(apiKey, "TRACEOPS_API_KEY")
+    apiKey
   };
 }

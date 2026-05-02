@@ -1,23 +1,40 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 const sha256HexPattern = /^[a-f0-9]{64}$/;
 
-export function isSha256Hex(value: string): boolean {
-  return sha256HexPattern.test(value);
+function normalizeHash(value: string): string {
+  return value.trim().toLowerCase();
 }
 
-export function requireSha256Hex(value: string, name: string): string {
-  if (!isSha256Hex(value)) {
-    throw new Error(`${name} must be a lowercase SHA-256 hex value`);
-  }
+function safeCompare(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left, "utf8");
+  const rightBuffer = Buffer.from(right, "utf8");
 
-  return value;
-}
-
-export function apiKeysMatch(suppliedApiKey: string, expectedApiKey: string): boolean {
-  if (!isSha256Hex(suppliedApiKey) || !isSha256Hex(expectedApiKey)) {
+  if (leftBuffer.length !== rightBuffer.length) {
     return false;
   }
 
-  return timingSafeEqual(Buffer.from(suppliedApiKey, "hex"), Buffer.from(expectedApiKey, "hex"));
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+export function hashApiKey(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export function requireSha256Hex(value: string, name: string): string {
+  const normalized = normalizeHash(value);
+
+  if (!sha256HexPattern.test(normalized)) {
+    throw new Error(`${name} must be a lowercase SHA-256 hex value`);
+  }
+
+  return normalized;
+}
+
+export function apiKeysMatch(suppliedApiKey: string, expectedApiKeyHash: string): boolean {
+  if (!suppliedApiKey) {
+    return false;
+  }
+
+  return safeCompare(hashApiKey(suppliedApiKey), normalizeHash(expectedApiKeyHash));
 }

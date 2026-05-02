@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { getConfig } from "../src/config.js";
 
-const validApiKeyHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const apiKeyHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 describe("getConfig", () => {
-  it("accepts a lowercase SHA-256 API key value", () => {
+  it("accepts and normalizes a SHA-256 API key hash", () => {
     const config = getConfig({
-      TRACEOPS_API_KEY: validApiKeyHash,
+      TRACEOPS_API_KEY: apiKeyHash.toUpperCase(),
       TRACEOPS_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true"
     });
 
-    expect(config.apiKey).toBe(validApiKeyHash);
+    expect(config.apiKey).toBe(apiKeyHash);
   });
 
   it("rejects a raw API key value", () => {
