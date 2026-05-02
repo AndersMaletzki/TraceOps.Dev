@@ -13,6 +13,9 @@ param environmentName string = 'prod'
 @secure()
 param traceOpsApiKey string
 
+@description('Optional principal object ID for TraceOps app deployment identity.')
+param appDeploymentPrincipalObjectId string = ''
+
 @description('Work items table name.')
 param workItemsTableName string = 'WorkItems'
 
@@ -31,6 +34,7 @@ module workload 'modules/workload.bicep' = {
     location: location
     environmentName: environmentName
     traceOpsApiKey: traceOpsApiKey
+    appDeploymentPrincipalObjectId: appDeploymentPrincipalObjectId
     workItemsTableName: workItemsTableName
     workItemEventsTableName: workItemEventsTableName
   }

@@ -10,6 +10,9 @@ param environmentName string = 'prod'
 @secure()
 param traceOpsApiKey string
 
+@description('Optional principal object ID for TraceOps app deployment identity.')
+param appDeploymentPrincipalObjectId string = ''
+
 @description('Work items table name.')
 param workItemsTableName string = 'WorkItems'
 
@@ -25,6 +28,7 @@ var logAnalyticsName = 'log-traceops-${environmentName}-${suffix}'
 var appInsightsName = 'appi-traceops-${environmentName}-${suffix}'
 var deploymentStorageContainerName = 'func-traceops-${normalizedEnvironmentName}-${suffix}-packages'
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+var websiteContributorRoleId = 'de139f84-1756-47ae-9be6-808fbbe84772'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
@@ -179,6 +183,16 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     workItemsTable
     workItemEventsTable
   ]
+}
+
+resource traceOpsDeploymentWebsiteContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appDeploymentPrincipalObjectId)) {
+  name: guid(functionApp.id, appDeploymentPrincipalObjectId, websiteContributorRoleId)
+  scope: functionApp
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', websiteContributorRoleId)
+    principalId: appDeploymentPrincipalObjectId
+    principalType: 'ServicePrincipal'
+  }
 }
 
 output functionAppName string = functionApp.name
