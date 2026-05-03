@@ -102,6 +102,15 @@ Expected behavior:
 
 ---
 
+## TraceOps MCP Context
+
+- Omit `tenantId` in MCP tool calls when `TRACEOPS_DEFAULT_TENANT_ID` is configured.
+- Use `get_context` when tenant context is unclear.
+- Never invent `tenantId` values.
+- `repoId` is repository-specific and must not be globally configured.
+
+---
+
 ## What Codex Should Avoid
 
 - Do not introduce Terraform.

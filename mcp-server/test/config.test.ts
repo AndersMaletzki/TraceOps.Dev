@@ -5,10 +5,12 @@ describe("getConfig", () => {
   it("accepts a raw API key value", () => {
     const config = getConfig({
       TRACEOPS_API_BASE_URL: "http://localhost:7071/api",
-      TRACEOPS_API_KEY: "local-dev-key"
+      TRACEOPS_API_KEY: "local-dev-key",
+      TRACEOPS_DEFAULT_TENANT_ID: "anders"
     });
 
     expect(config.apiKey).toBe("local-dev-key");
+    expect(config.defaultTenantId).toBe("anders");
   });
 
   it("requires an API key value", () => {

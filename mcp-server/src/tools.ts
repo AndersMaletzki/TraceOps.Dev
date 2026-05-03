@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TraceOpsApiClient } from "./apiClient.js";
+import { resolveTenantId, TraceOpsMcpContext } from "./context.js";
 import {
   workItemCategories,
   workItemSeverities,
@@ -11,7 +12,7 @@ import {
 } from "./types.js";
 
 const tenantRepoSchema = {
-  tenantId: z.string().min(1),
+  tenantId: z.string().min(1).optional(),
   repoId: z.string().min(1)
 };
 
@@ -53,7 +54,47 @@ function result(data: unknown) {
   };
 }
 
-export function registerTraceOpsTools(server: McpServer, client: TraceOpsApiClient): void {
+function withResolvedTenant<T extends { tenantId?: string }>(
+  input: T,
+  context: TraceOpsMcpContext
+): { ok: true; input: Omit<T, "tenantId"> & { tenantId: string } } | { ok: false; error: unknown } {
+  const tenantResolution = resolveTenantId(input.tenantId, context.defaultTenantId);
+
+  if (!tenantResolution.ok) {
+    return {
+      ok: false,
+      error: {
+        error: tenantResolution.error
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    input: {
+      ...input,
+      tenantId: tenantResolution.tenantId
+    }
+  };
+}
+
+export function registerTraceOpsTools(
+  server: McpServer,
+  client: TraceOpsApiClient,
+  context: TraceOpsMcpContext = {}
+): void {
+  server.tool(
+    "get_context",
+    "Get the current TraceOps MCP context.",
+    {},
+    async () =>
+      result({
+        tenantId: context.defaultTenantId ?? null,
+        repoId: null,
+        hasDefaultTenant: Boolean(context.defaultTenantId)
+      })
+  );
+
   server.tool(
     "create_workitem",
     "Create one TraceOps work item.",
@@ -74,7 +115,14 @@ export function registerTraceOpsTools(server: McpServer, client: TraceOpsApiClie
       externalCommitUrl: z.string().optional(),
       externalPrUrl: z.string().optional()
     },
-    async (input) => result(summarize(await client.createWorkItem(input)))
+    async (input) => {
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(summarize(await client.createWorkItem(resolved.input)));
+    }
   );
 
   server.tool(
@@ -82,7 +130,12 @@ export function registerTraceOpsTools(server: McpServer, client: TraceOpsApiClie
     "Search TraceOps work items in a tenant/repository partition.",
     filterSchema,
     async (input) => {
-      const response = await client.searchWorkItems(input);
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      const response = await client.searchWorkItems(resolved.input);
       return result({
         count: response.count,
         items: response.items.map(summarize)
@@ -97,14 +150,28 @@ export function registerTraceOpsTools(server: McpServer, client: TraceOpsApiClie
       ...tenantRepoSchema,
       workItemId: z.string().min(1)
     },
-    async (input) => result(await client.getWorkItem(input))
+    async (input) => {
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(await client.getWorkItem(resolved.input));
+    }
   );
 
   server.tool(
     "get_next_workitem",
     "Get the next actionable TraceOps work item.",
     filterSchema,
-    async (input) => result(summarize(await client.getNextWorkItem(input)))
+    async (input) => {
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(summarize(await client.getNextWorkItem(resolved.input)));
+    }
   );
 
   server.tool(
@@ -116,7 +183,14 @@ export function registerTraceOpsTools(server: McpServer, client: TraceOpsApiClie
       status: z.enum(workItemStatuses),
       actor: z.string().min(1)
     },
-    async (input) => result(summarize(await client.updateWorkItemStatus(input)))
+    async (input) => {
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(summarize(await client.updateWorkItemStatus(resolved.input)));
+    }
   );
 
   server.tool(
@@ -128,7 +202,14 @@ export function registerTraceOpsTools(server: McpServer, client: TraceOpsApiClie
       claimedBy: z.string().min(1),
       claimDurationMinutes: z.number().int().min(1).optional()
     },
-    async (input) => result(summarize(await client.claimWorkItem(input)))
+    async (input) => {
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(summarize(await client.claimWorkItem(resolved.input)));
+    }
   );
 
   server.tool(
@@ -141,6 +222,13 @@ export function registerTraceOpsTools(server: McpServer, client: TraceOpsApiClie
       externalCommitUrl: z.string().optional(),
       externalPrUrl: z.string().optional()
     },
-    async (input) => result(summarize(await client.updateWorkItemLinks(input)))
+    async (input) => {
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(summarize(await client.updateWorkItemLinks(resolved.input)));
+    }
   );
 }

@@ -135,7 +135,8 @@ Example Codex/Claude MCP config:
       "args": ["/absolute/path/to/TraceOps.Dev/mcp-server/dist/server.js"],
       "env": {
         "TRACEOPS_API_BASE_URL": "http://localhost:7071/api",
-        "TRACEOPS_API_KEY": "local-dev-key"
+        "TRACEOPS_API_KEY": "local-dev-key",
+        "TRACEOPS_DEFAULT_TENANT_ID": "demo-tenant"
       }
     }
   }
@@ -144,6 +145,7 @@ Example Codex/Claude MCP config:
 
 Available tools:
 
+- `get_context`
 - `create_workitem`
 - `search_workitems`
 - `get_workitem`
@@ -152,7 +154,7 @@ Available tools:
 - `claim_workitem`
 - `update_workitem_links`
 
-Tool responses are intentionally concise. All tools require `tenantId` and `repoId`.
+Tool responses are intentionally concise. Work item tools require `repoId`. `tenantId` may be omitted when `TRACEOPS_DEFAULT_TENANT_ID` is configured; explicit `tenantId` values still override the default. The MCP server does not provide a global default `repoId`.
 
 ## Infrastructure
 

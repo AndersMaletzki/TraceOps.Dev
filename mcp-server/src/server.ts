@@ -12,7 +12,9 @@ async function main(): Promise<void> {
     version: "0.1.0"
   });
 
-  registerTraceOpsTools(server, new TraceOpsApiClient(config.apiBaseUrl, config.apiKey));
+  registerTraceOpsTools(server, new TraceOpsApiClient(config.apiBaseUrl, config.apiKey), {
+    defaultTenantId: config.defaultTenantId
+  });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
