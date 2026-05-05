@@ -57,9 +57,12 @@ GET   /workitems/next
 PATCH /workitems/{workItemId}/status
 PATCH /workitems/{workItemId}/claim
 PATCH /workitems/{workItemId}/links
+POST  /auth/sync-user
 ```
 
 `tenantId` and `repoId` are required for all read/update operations so queries stay inside one Table Storage partition.
+
+`POST /auth/sync-user` is a trusted backend integration endpoint for the website. The website backend derives the authenticated identity from Azure Static Web Apps auth headers and calls TraceOps with `x-api-key`; browser-provided identity is not trusted. The endpoint creates or updates the user, updates login metadata, stores `isAdmin` when roles contain `admin`, creates a personal tenant when missing, and ensures an owner tenant membership exists.
 
 ## Storage Design
 
@@ -167,6 +170,7 @@ Append-only event types:
 - Claims record `claimedBy`, `claimedAt`, and `claimExpiresAt`.
 - Active unexpired claims by another claimant return `409 Conflict`.
 - Link updates store only external branch, commit, and PR metadata.
+- User sync returns `user`, `personalTenant`, and `memberships` without secrets or API keys.
 
 ## Deployment
 

@@ -22,6 +22,15 @@ param workItemsTableName string = 'WorkItems'
 @description('Work item events table name.')
 param workItemEventsTableName string = 'WorkItemEvents'
 
+@description('Users table name.')
+param usersTableName string = 'TraceOpsUsers'
+
+@description('Tenants table name.')
+param tenantsTableName string = 'TraceOpsTenants'
+
+@description('Tenant members table name.')
+param tenantMembersTableName string = 'TraceOpsTenantMembers'
+
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
@@ -37,6 +46,9 @@ module workload 'modules/workload.bicep' = {
     appDeploymentPrincipalObjectId: appDeploymentPrincipalObjectId
     workItemsTableName: workItemsTableName
     workItemEventsTableName: workItemEventsTableName
+    usersTableName: usersTableName
+    tenantsTableName: tenantsTableName
+    tenantMembersTableName: tenantMembersTableName
   }
 }
 
@@ -45,3 +57,6 @@ output resourceGroup string = resourceGroup.name
 output storageAccountName string = workload.outputs.storageAccountName
 output workItemsTable string = workload.outputs.workItemsTable
 output workItemEventsTable string = workload.outputs.workItemEventsTable
+output usersTable string = workload.outputs.usersTable
+output tenantsTable string = workload.outputs.tenantsTable
+output tenantMembersTable string = workload.outputs.tenantMembersTable

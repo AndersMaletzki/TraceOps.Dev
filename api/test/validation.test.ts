@@ -4,6 +4,7 @@ import {
   parseCreateWorkItemInput,
   parseSeverity,
   parseStatus,
+  parseSyncUserInput,
   parseWorkItemType,
   ValidationError
 } from "../src/validation.js";
@@ -74,5 +75,44 @@ describe("parseCreateWorkItemInput", () => {
     expect(() => parseCategory("Feature")).toThrow(ValidationError);
     expect(() => parseSeverity("Urgent")).toThrow(ValidationError);
     expect(() => parseStatus("Done")).toThrow(ValidationError);
+  });
+});
+
+describe("parseSyncUserInput", () => {
+  it("validates and normalizes a trusted user sync payload", () => {
+    const input = parseSyncUserInput({
+      identityProvider: " github ",
+      providerUserId: "123456",
+      userDetails: "octocat@example.com",
+      displayName: " Octo Cat ",
+      roles: [" Anonymous ", "Admin"]
+    });
+
+    expect(input).toEqual({
+      identityProvider: "github",
+      providerUserId: "123456",
+      userDetails: "octocat@example.com",
+      displayName: "Octo Cat",
+      roles: ["anonymous", "admin"]
+    });
+  });
+
+  it("requires roles and storage-safe identity key segments", () => {
+    expect(() =>
+      parseSyncUserInput({
+        identityProvider: "github",
+        providerUserId: "123/456",
+        userDetails: "octocat@example.com",
+        roles: []
+      })
+    ).toThrow(ValidationError);
+
+    expect(() =>
+      parseSyncUserInput({
+        identityProvider: "github",
+        providerUserId: "123456",
+        userDetails: "octocat@example.com"
+      })
+    ).toThrow(ValidationError);
   });
 });

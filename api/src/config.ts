@@ -5,6 +5,9 @@ export type TraceOpsConfig = {
   storageConnectionString: string;
   workItemsTableName: string;
   workItemEventsTableName: string;
+  usersTableName: string;
+  tenantsTableName: string;
+  tenantMembersTableName: string;
 };
 
 export function getConfig(env: NodeJS.ProcessEnv = process.env): TraceOpsConfig {
@@ -23,6 +26,9 @@ export function getConfig(env: NodeJS.ProcessEnv = process.env): TraceOpsConfig 
     apiKey: requireSha256Hex(apiKey, "TRACEOPS_API_KEY"),
     storageConnectionString,
     workItemsTableName: env.TRACEOPS_TABLE_WORKITEMS || "WorkItems",
-    workItemEventsTableName: env.TRACEOPS_TABLE_WORKITEM_EVENTS || "WorkItemEvents"
+    workItemEventsTableName: env.TRACEOPS_TABLE_WORKITEM_EVENTS || "WorkItemEvents",
+    usersTableName: env.TRACEOPS_TABLE_USERS || "TraceOpsUsers",
+    tenantsTableName: env.TRACEOPS_TABLE_TENANTS || "TraceOpsTenants",
+    tenantMembersTableName: env.TRACEOPS_TABLE_TENANT_MEMBERS || "TraceOpsTenantMembers"
   };
 }

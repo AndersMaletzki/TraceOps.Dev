@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { partitionKey } from "../src/domain.js";
-import { toStoredWorkItem, toWorkItem } from "../src/storage.js";
+import {
+  tenantMemberPartitionKey,
+  tenantMemberRowKey,
+  toStoredTenant,
+  toStoredTenantMember,
+  toStoredUser,
+  toStoredWorkItem,
+  toTenant,
+  toTenantMember,
+  toUser,
+  toWorkItem
+} from "../src/storage.js";
 
 describe("storage mapping", () => {
   it("serializes arrays for Table Storage and restores API shape", () => {
@@ -69,5 +80,58 @@ describe("storage mapping", () => {
       externalCommitUrl: "",
       externalPrUrl: ""
     });
+  });
+
+  it("maps users to the identity table key shape", () => {
+    const user = {
+      userKey: "github|123456",
+      identityProvider: "github",
+      providerUserId: "123456",
+      userDetails: "{\"login\":\"octocat\"}",
+      displayName: "Octo Cat",
+      createdAtUtc: "2026-05-05T12:00:00.000Z",
+      lastLoginAtUtc: "2026-05-05T12:00:00.000Z",
+      loginCount: 1,
+      isAdmin: false
+    };
+
+    const stored = toStoredUser(user);
+
+    expect(stored.partitionKey).toBe("USER");
+    expect(stored.rowKey).toBe("github|123456");
+    expect(toUser(stored)).toEqual(user);
+  });
+
+  it("maps tenants to the tenant table key shape", () => {
+    const tenant = {
+      tenantId: "tenant-123",
+      tenantType: "personal" as const,
+      name: "Octo Cat",
+      createdByUserKey: "github|123456",
+      createdAtUtc: "2026-05-05T12:00:00.000Z"
+    };
+
+    const stored = toStoredTenant(tenant);
+
+    expect(stored.partitionKey).toBe("TENANT");
+    expect(stored.rowKey).toBe("tenant-123");
+    expect(toTenant(stored)).toEqual(tenant);
+  });
+
+  it("maps tenant members to the tenant membership key shape", () => {
+    const member = {
+      tenantId: "tenant-123",
+      userKey: "github|123456",
+      role: "owner" as const,
+      createdAtUtc: "2026-05-05T12:00:00.000Z"
+    };
+
+    const stored = toStoredTenantMember(member);
+
+    expect(tenantMemberPartitionKey("tenant-123")).toBe("TENANT~tenant-123");
+    expect(tenantMemberRowKey("github|123456")).toBe("USER~github|123456");
+    expect(stored.partitionKey).toBe("TENANT~tenant-123");
+    expect(stored.rowKey).toBe("USER~github|123456");
+    expect(toTenantMember(stored)).toEqual(member);
   });
 });

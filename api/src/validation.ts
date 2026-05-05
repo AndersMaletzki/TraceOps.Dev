@@ -1,5 +1,6 @@
 import {
   CreateWorkItemInput,
+  SyncUserInput,
   workItemCategories,
   WorkItemCategory,
   workItemSeverities,
@@ -59,6 +60,24 @@ export function optionalStringArray(value: unknown, fieldName: string): string[]
   }
 
   return value.map((item) => item.trim()).filter(Boolean);
+}
+
+export function requiredStringArray(value: unknown, fieldName: string): string[] {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new ValidationError(`${fieldName} must be an array of strings`);
+  }
+
+  return value.map((item) => item.trim()).filter(Boolean);
+}
+
+function requiredTableKeySegment(value: unknown, fieldName: string): string {
+  const segment = requiredString(value, fieldName);
+
+  if (/[\\/#?\u0000-\u001F\u007F-\u009F]/.test(segment)) {
+    throw new ValidationError(`${fieldName} contains characters that are not allowed in storage keys`);
+  }
+
+  return segment;
 }
 
 export function parseLimit(value: unknown, defaultLimit = 10, maxLimit = 50): number {
@@ -130,5 +149,17 @@ export function parseCreateWorkItemInput(value: unknown): CreateWorkItemInput {
     externalBranchName: optionalString(body.externalBranchName, "externalBranchName"),
     externalCommitUrl: optionalString(body.externalCommitUrl, "externalCommitUrl"),
     externalPrUrl: optionalString(body.externalPrUrl, "externalPrUrl")
+  };
+}
+
+export function parseSyncUserInput(value: unknown): SyncUserInput {
+  const body = requireRecord(value);
+
+  return {
+    identityProvider: requiredTableKeySegment(body.identityProvider, "identityProvider"),
+    providerUserId: requiredTableKeySegment(body.providerUserId, "providerUserId"),
+    userDetails: requiredString(body.userDetails, "userDetails"),
+    displayName: optionalString(body.displayName, "displayName"),
+    roles: requiredStringArray(body.roles, "roles").map((role) => role.toLowerCase())
   };
 }

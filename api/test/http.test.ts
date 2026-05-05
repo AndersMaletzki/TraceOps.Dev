@@ -17,7 +17,10 @@ function configWithApiKey(apiKey: string): TraceOpsConfig {
     apiKey,
     storageConnectionString: "UseDevelopmentStorage=true",
     workItemsTableName: "WorkItems",
-    workItemEventsTableName: "WorkItemEvents"
+    workItemEventsTableName: "WorkItemEvents",
+    usersTableName: "TraceOpsUsers",
+    tenantsTableName: "TraceOpsTenants",
+    tenantMembersTableName: "TraceOpsTenantMembers"
   };
 }
 

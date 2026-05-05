@@ -19,6 +19,15 @@ param workItemsTableName string = 'WorkItems'
 @description('Work item events table name.')
 param workItemEventsTableName string = 'WorkItemEvents'
 
+@description('Users table name.')
+param usersTableName string = 'TraceOpsUsers'
+
+@description('Tenants table name.')
+param tenantsTableName string = 'TraceOpsTenants'
+
+@description('Tenant members table name.')
+param tenantMembersTableName string = 'TraceOpsTenantMembers'
+
 var suffix = take(uniqueString(subscription().id, resourceGroup().id, environmentName), 6)
 var normalizedEnvironmentName = toLower(replace(environmentName, '-', ''))
 var storageAccountName = take('sttraceops${normalizedEnvironmentName}${suffix}', 24)
@@ -70,6 +79,21 @@ resource workItemsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@
 
 resource workItemEventsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
   name: workItemEventsTableName
+  parent: tableService
+}
+
+resource usersTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  name: usersTableName
+  parent: tableService
+}
+
+resource tenantsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  name: tenantsTableName
+  parent: tableService
+}
+
+resource tenantMembersTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  name: tenantMembersTableName
   parent: tableService
 }
 
@@ -164,6 +188,18 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
           value: workItemEventsTableName
         }
         {
+          name: 'TRACEOPS_TABLE_USERS'
+          value: usersTableName
+        }
+        {
+          name: 'TRACEOPS_TABLE_TENANTS'
+          value: tenantsTableName
+        }
+        {
+          name: 'TRACEOPS_TABLE_TENANT_MEMBERS'
+          value: tenantMembersTableName
+        }
+        {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsights.properties.ConnectionString
         }
@@ -174,6 +210,9 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     deploymentStorageContainer
     workItemsTable
     workItemEventsTable
+    usersTable
+    tenantsTable
+    tenantMembersTable
   ]
 }
 
@@ -191,3 +230,6 @@ output functionAppName string = functionApp.name
 output storageAccountName string = storageAccount.name
 output workItemsTable string = workItemsTable.name
 output workItemEventsTable string = workItemEventsTable.name
+output usersTable string = usersTable.name
+output tenantsTable string = tenantsTable.name
+output tenantMembersTable string = tenantMembersTable.name

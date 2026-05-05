@@ -11,6 +11,23 @@ describe("getConfig", () => {
     });
 
     expect(config.apiKey).toBe(apiKeyHash);
+    expect(config.usersTableName).toBe("TraceOpsUsers");
+    expect(config.tenantsTableName).toBe("TraceOpsTenants");
+    expect(config.tenantMembersTableName).toBe("TraceOpsTenantMembers");
+  });
+
+  it("accepts identity table name overrides", () => {
+    const config = getConfig({
+      TRACEOPS_API_KEY: apiKeyHash,
+      TRACEOPS_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true",
+      TRACEOPS_TABLE_USERS: "UsersLocal",
+      TRACEOPS_TABLE_TENANTS: "TenantsLocal",
+      TRACEOPS_TABLE_TENANT_MEMBERS: "TenantMembersLocal"
+    });
+
+    expect(config.usersTableName).toBe("UsersLocal");
+    expect(config.tenantsTableName).toBe("TenantsLocal");
+    expect(config.tenantMembersTableName).toBe("TenantMembersLocal");
   });
 
   it("rejects a raw API key value", () => {

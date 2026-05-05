@@ -28,6 +28,53 @@ export const workItemStatuses = [
 ] as const;
 export type WorkItemStatus = (typeof workItemStatuses)[number];
 
+export const tenantTypes = ["personal", "team"] as const;
+export type TenantType = (typeof tenantTypes)[number];
+
+export const tenantMemberRoles = ["owner", "admin", "member", "viewer"] as const;
+export type TenantMemberRole = (typeof tenantMemberRoles)[number];
+
+export type TraceOpsUser = {
+  userKey: string;
+  identityProvider: string;
+  providerUserId: string;
+  userDetails: string;
+  displayName: string;
+  createdAtUtc: string;
+  lastLoginAtUtc: string;
+  loginCount: number;
+  isAdmin: boolean;
+};
+
+export type TraceOpsTenant = {
+  tenantId: string;
+  tenantType: TenantType;
+  name: string;
+  createdByUserKey: string;
+  createdAtUtc: string;
+};
+
+export type TraceOpsTenantMember = {
+  tenantId: string;
+  userKey: string;
+  role: TenantMemberRole;
+  createdAtUtc: string;
+};
+
+export type SyncUserInput = {
+  identityProvider: string;
+  providerUserId: string;
+  userDetails: string;
+  displayName?: string;
+  roles: string[];
+};
+
+export type SyncUserResult = {
+  user: TraceOpsUser;
+  personalTenant: TraceOpsTenant;
+  memberships: TraceOpsTenantMember[];
+};
+
 export type WorkItem = {
   tenantId: string;
   repoId: string;
