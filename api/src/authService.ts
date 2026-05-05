@@ -102,6 +102,10 @@ export class AuthService {
     return this.tenantMembers.listTenantMembershipsForUser(userKey);
   }
 
+  async getTenant(tenantId: string): Promise<TraceOpsTenant | undefined> {
+    return getOrUndefined(() => this.tenants.getTenant(tenantId));
+  }
+
   private async upsertSyncedUser(
     input: SyncUserInput,
     existingUser: TraceOpsUser | undefined,

@@ -321,6 +321,56 @@ export class WorkItemRepository {
     return items;
   }
 
+  async listWorkItemsForTenant(tenantId: string, limit: number): Promise<StoredWorkItemResult[]> {
+    const items: StoredWorkItemResult[] = [];
+    const filter = odata`tenantId eq ${tenantId}`;
+
+    for await (const entity of this.workItemsClient.listEntities<StoredWorkItemResult>({
+      queryOptions: { filter }
+    })) {
+      items.push(entity);
+
+      if (items.length >= limit) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
+  async listAllWorkItems(limit: number): Promise<StoredWorkItemResult[]> {
+    const items: StoredWorkItemResult[] = [];
+
+    for await (const entity of this.workItemsClient.listEntities<StoredWorkItemResult>()) {
+      items.push(entity);
+
+      if (items.length >= limit) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
+  async listRepositoryIdsForTenant(tenantId: string, limit = 250): Promise<string[]> {
+    const repoIds = new Set<string>();
+    const filter = odata`tenantId eq ${tenantId}`;
+
+    for await (const entity of this.workItemsClient.listEntities<StoredWorkItemResult>({
+      queryOptions: { filter, select: ["repoId"] }
+    })) {
+      if (entity.repoId) {
+        repoIds.add(entity.repoId);
+      }
+
+      if (repoIds.size >= limit) {
+        break;
+      }
+    }
+
+    return [...repoIds].sort((left, right) => left.localeCompare(right));
+  }
+
   async replaceWorkItem(entity: StoredWorkItemResult): Promise<WorkItem> {
     try {
       await this.workItemsClient.updateEntity(entity, "Replace", { etag: entity.etag });
@@ -364,6 +414,23 @@ export class UserRepository {
     const entity = toStoredUser(user);
     await this.usersClient.upsertEntity(entity, "Replace");
     return toUser(entity);
+  }
+
+  async listUsers(limit = 10000): Promise<TraceOpsUser[]> {
+    const users: TraceOpsUser[] = [];
+    const filter = odata`PartitionKey eq ${"USER"}`;
+
+    for await (const entity of this.usersClient.listEntities<StoredTraceOpsUserResult>({
+      queryOptions: { filter }
+    })) {
+      users.push(toUser(entity));
+
+      if (users.length >= limit) {
+        break;
+      }
+    }
+
+    return users;
   }
 }
 

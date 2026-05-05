@@ -101,6 +101,114 @@ describe("WorkItemService", () => {
     expect(repository.listWorkItems).not.toHaveBeenCalled();
   });
 
+  it("returns app work items for a selected repoId after tenant membership validation", async () => {
+    const repository = {
+      listRepositoryIdsForTenant: vi.fn(async () => ["repo"]),
+      listWorkItems: vi.fn(async () => [createStored()]),
+      listWorkItemsForTenant: vi.fn()
+    } as unknown as WorkItemRepository;
+    const authService = {
+      assertTenantMember: vi.fn(async () => undefined),
+      listUserTenants: vi.fn(),
+      getTenant: vi.fn(async () => ({
+        tenantId: "tenant",
+        tenantType: "personal" as const,
+        name: "Octo Cat",
+        createdByUserKey: "github|123456",
+        createdAtUtc: "2026-05-01T15:30:00.000Z"
+      }))
+    };
+
+    const service = new WorkItemService(repository, authService);
+    const result = await service.listAppWorkItems({
+      tenantId: "tenant",
+      repoId: "repo",
+      callerUserKey: "github|123456",
+      limit: 25
+    });
+
+    expect(result).toMatchObject({
+      caller: { userKey: "github|123456" },
+      activeTenant: { tenantId: "tenant" },
+      repoId: "repo",
+      repositoryOptions: [{ tenantId: "tenant", repoId: "repo", label: "repo" }],
+      count: 1
+    });
+    expect(authService.assertTenantMember).toHaveBeenCalledWith("github|123456", "tenant");
+    expect(repository.listWorkItems).toHaveBeenCalledWith("tenant", "repo", 250);
+  });
+
+  it("returns app work items across accessible tenant repositories when repoId is omitted", async () => {
+    const repository = {
+      listRepositoryIdsForTenant: vi.fn(async (tenantId: string) =>
+        tenantId === "tenant-a" ? ["repo-a"] : ["repo-b"]
+      ),
+      listWorkItemsForTenant: vi.fn(async (tenantId: string) => [
+        createStored({
+          tenantId,
+          repoId: tenantId === "tenant-a" ? "repo-a" : "repo-b",
+          workItemId: `ITEM~20260501153000~${tenantId}`
+        })
+      ]),
+      listWorkItems: vi.fn()
+    } as unknown as WorkItemRepository;
+    const authService = {
+      assertTenantMember: vi.fn(),
+      listUserTenants: vi.fn(async () => [
+        { tenantId: "tenant-a", userKey: "github|123456", role: "owner" as const, createdAtUtc: "" },
+        { tenantId: "tenant-b", userKey: "github|123456", role: "member" as const, createdAtUtc: "" }
+      ]),
+      getTenant: vi.fn(async () => ({
+        tenantId: "tenant-a",
+        tenantType: "personal" as const,
+        name: "Tenant A",
+        createdByUserKey: "github|123456",
+        createdAtUtc: "2026-05-01T15:30:00.000Z"
+      }))
+    };
+
+    const service = new WorkItemService(repository, authService);
+    const result = await service.listAppWorkItems({
+      callerUserKey: "github|123456",
+      limit: 25
+    });
+
+    expect(result.repoId).toBeNull();
+    expect(result.count).toBe(2);
+    expect(result.repositoryOptions).toEqual([
+      { tenantId: "tenant-a", repoId: "repo-a", label: "repo-a" },
+      { tenantId: "tenant-b", repoId: "repo-b", label: "repo-b" }
+    ]);
+    expect(repository.listWorkItemsForTenant).toHaveBeenCalledWith("tenant-a", 250);
+    expect(repository.listWorkItemsForTenant).toHaveBeenCalledWith("tenant-b", 250);
+  });
+
+  it("rejects app work items for an explicit tenant when the caller is not a member", async () => {
+    const repository = {
+      listRepositoryIdsForTenant: vi.fn(),
+      listWorkItems: vi.fn(),
+      listWorkItemsForTenant: vi.fn()
+    } as unknown as WorkItemRepository;
+    const authService = {
+      assertTenantMember: vi.fn(async () => {
+        throw new TenantAccessDeniedError("tenant");
+      }),
+      listUserTenants: vi.fn(),
+      getTenant: vi.fn()
+    };
+
+    const service = new WorkItemService(repository, authService);
+
+    await expect(
+      service.listAppWorkItems({
+        tenantId: "tenant",
+        callerUserKey: "github|other",
+        limit: 25
+      })
+    ).rejects.toThrow(TenantAccessDeniedError);
+    expect(repository.listWorkItemsForTenant).not.toHaveBeenCalled();
+  });
+
   it("keeps API-key-only listing working when no caller user key is supplied", async () => {
     const repository = {
       listWorkItems: vi.fn(async () => [createStored()])

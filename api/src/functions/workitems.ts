@@ -38,18 +38,6 @@ function getService(): { config: TraceOpsConfig; service: WorkItemService } {
   };
 }
 
-async function handleApp(
-  request: HttpRequest,
-  operation: (service: WorkItemService) => Promise<HttpResponseInit>
-): Promise<HttpResponseInit> {
-  try {
-    const { service } = getService();
-    return await operation(service);
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
-
 async function handle(
   request: HttpRequest,
   operation: (service: WorkItemService) => Promise<HttpResponseInit>
@@ -150,31 +138,9 @@ export async function listAppWorkItems(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handleApp(request, async (service) => {
+  return handle(request, async (service) => {
     const filters = parseAppWorkItemFiltersFromQuery(request);
-
-    if (filters.tenantId) {
-      const workItems = await service.list({
-        ...filters,
-        tenantId: filters.tenantId
-      });
-      return json(200, { items: workItems, count: workItems.length });
-    }
-
-    const memberships = await service.listUserTenants(filters.callerUserKey);
-    const perTenantLimit = filters.limit;
-    const tenantResults = await Promise.all(
-      memberships.map((membership) =>
-        service.list({
-          ...filters,
-          tenantId: membership.tenantId,
-          limit: perTenantLimit
-        })
-      )
-    );
-    const workItems = tenantResults.flat().slice(0, filters.limit);
-
-    return json(200, { items: workItems, count: workItems.length });
+    return json(200, await service.listAppWorkItems(filters));
   });
 }
 

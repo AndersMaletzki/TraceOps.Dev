@@ -134,6 +134,51 @@ export type WorkItemFilters = {
   limit: number;
 };
 
+export type RepositoryOption = {
+  tenantId: string;
+  repoId: string;
+  label: string;
+};
+
+export type AppWorkItemFilters = {
+  tenantId?: string;
+  repoId?: string;
+  callerUserKey: string;
+  status?: WorkItemStatus;
+  severity?: WorkItemSeverity;
+  workItemType?: WorkItemType;
+  category?: WorkItemCategory;
+  limit: number;
+};
+
+export type AppWorkItemsResult = {
+  caller: {
+    userKey: string;
+  };
+  activeTenant: TraceOpsTenant | null;
+  repoId: string | null;
+  repositoryOptions: RepositoryOption[];
+  items: WorkItem[];
+  count: number;
+};
+
+export type UserMetrics = {
+  totalUsers: number;
+  githubUsers: number;
+  microsoftUsers: number;
+  adminUsers: number;
+  usersCreatedLast7Days: number;
+  activeUsersLast30Days: number;
+};
+
+export type IssueMetrics = {
+  totalIssues: number;
+  openIssues: number;
+  fixedIssues: number;
+  closedIssues: number;
+  issuesCreatedLast7Days: number;
+};
+
 export type UpdateStatusInput = {
   tenantId: string;
   repoId: string;

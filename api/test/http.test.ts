@@ -71,10 +71,26 @@ describe("caller user parsing", () => {
     expect(parseCallerUserKey(request)).toBe("github|123456");
   });
 
+  it("does not trust caller user keys from query parameters", () => {
+    const request = requestWithQueryAndHeaders({ callerUserKey: "github|123456" });
+
+    expect(parseCallerUserKey(request)).toBeUndefined();
+  });
+
   it("requires a caller user key for app work item reads", () => {
     const request = requestWithQueryAndHeaders({ repoId: "AndersMaletzki/TraceOps.Dev" });
 
     expect(() => parseAppWorkItemFiltersFromQuery(request)).toThrow("callerUserKey is required");
+  });
+
+  it("allows app work item reads without a repoId", () => {
+    const request = requestWithQueryAndHeaders({}, { "x-traceops-user-key": "github|123456" });
+
+    expect(parseAppWorkItemFiltersFromQuery(request)).toMatchObject({
+      callerUserKey: "github|123456",
+      repoId: undefined,
+      tenantId: undefined
+    });
   });
 
   it("maps tenant membership failures to 403", () => {

@@ -1,4 +1,5 @@
 import { HttpRequest, HttpResponseInit } from "@azure/functions";
+import { AdminAccessDeniedError } from "./adminMetricsService.js";
 import { apiKeysMatch } from "./apiKey.js";
 import { TenantAccessDeniedError } from "./authService.js";
 import { TraceOpsConfig } from "./config.js";
@@ -14,6 +15,7 @@ import {
   ValidationError
 } from "./validation.js";
 import {
+  AppWorkItemFilters,
   workItemCategories,
   workItemSeverities,
   workItemStatuses,
@@ -63,22 +65,16 @@ export function parseFiltersFromQuery(request: HttpRequest): WorkItemFilters {
 export function parseCallerUserKey(request: HttpRequest): string | undefined {
   const value =
     request.headers.get("x-traceops-user-key") ||
-    request.headers.get("x-user-key") ||
-    request.query.get("callerUserKey");
+    request.headers.get("x-user-key");
   const trimmed = value?.trim();
 
   return trimmed || undefined;
 }
 
-type AppWorkItemFilters = Omit<WorkItemFilters, "tenantId" | "callerUserKey"> & {
-  tenantId?: string;
-  callerUserKey: string;
-};
-
 export function parseAppWorkItemFiltersFromQuery(request: HttpRequest): AppWorkItemFilters {
   return {
     tenantId: request.query.get("tenantId")?.trim() || undefined,
-    repoId: requiredString(request.query.get("repoId"), "repoId"),
+    repoId: request.query.get("repoId")?.trim() || undefined,
     callerUserKey: requiredString(parseCallerUserKey(request), "callerUserKey"),
     status: parseOptionalEnum(request.query.get("status"), workItemStatuses, "status"),
     severity: parseOptionalEnum(request.query.get("severity"), workItemSeverities, "severity"),
@@ -169,6 +165,10 @@ export function errorResponse(error: unknown): HttpResponseInit {
   }
 
   if (error instanceof TenantAccessDeniedError) {
+    return json(403, { error: error.message });
+  }
+
+  if (error instanceof AdminAccessDeniedError) {
     return json(403, { error: error.message });
   }
 

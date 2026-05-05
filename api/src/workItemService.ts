@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
 import {
+  AppWorkItemFilters,
+  AppWorkItemsResult,
   ClaimWorkItemInput,
   CreateWorkItemInput,
+  RepositoryOption,
   severityRank,
+  TraceOpsTenant,
   UpdateLinksInput,
   UpdateStatusInput,
   WorkItem,
@@ -126,7 +130,7 @@ export function buildLinksUpdatedEvent(workItem: WorkItem, now: string, eventId:
 export class WorkItemService {
   constructor(
     private readonly repository: WorkItemRepository,
-    private readonly authService?: Pick<AuthService, "assertTenantMember" | "listUserTenants">
+    private readonly authService?: Pick<AuthService, "assertTenantMember" | "listUserTenants" | "getTenant">
   ) {}
 
   async create(input: CreateWorkItemInput): Promise<WorkItem> {
@@ -145,6 +149,28 @@ export class WorkItemService {
       .map(toWorkItem)
       .filter((workItem) => matchesFilters(workItem, filters))
       .slice(0, filters.limit);
+  }
+
+  async listAppWorkItems(filters: AppWorkItemFilters): Promise<AppWorkItemsResult> {
+    const memberships = filters.tenantId
+      ? await this.getValidatedSingleTenantMembership(filters.callerUserKey, filters.tenantId)
+      : await this.listUserTenants(filters.callerUserKey);
+    const tenantIds = memberships.map((membership) => membership.tenantId);
+    const repositoryOptions = await this.listRepositoryOptions(tenantIds);
+    const activeTenantId = filters.tenantId || memberships[0]?.tenantId;
+    const activeTenant = activeTenantId ? await this.getTenant(activeTenantId) : null;
+    const items = await this.listAppWorkItemRows(filters, tenantIds);
+
+    return {
+      caller: {
+        userKey: filters.callerUserKey
+      },
+      activeTenant,
+      repoId: filters.repoId || null,
+      repositoryOptions,
+      items,
+      count: items.length
+    };
   }
 
   async get(tenantId: string, repoId: string, workItemId: string, callerUserKey?: string): Promise<WorkItem> {
@@ -239,5 +265,52 @@ export class WorkItemService {
     }
 
     await this.authService.assertTenantMember(callerUserKey, tenantId);
+  }
+
+  private async getValidatedSingleTenantMembership(callerUserKey: string, tenantId: string) {
+    await this.assertTenantAccess(callerUserKey, tenantId);
+    return [{ tenantId, userKey: callerUserKey, role: "viewer" as const, createdAtUtc: "" }];
+  }
+
+  private async listRepositoryOptions(tenantIds: string[]): Promise<RepositoryOption[]> {
+    const perTenantRepoIds = await Promise.all(
+      tenantIds.map(async (tenantId) => ({
+        tenantId,
+        repoIds: await this.repository.listRepositoryIdsForTenant(tenantId)
+      }))
+    );
+
+    return perTenantRepoIds.flatMap(({ tenantId, repoIds }) =>
+      repoIds.map((repoId) => ({
+        tenantId,
+        repoId,
+        label: repoId
+      }))
+    );
+  }
+
+  private async listAppWorkItemRows(filters: AppWorkItemFilters, tenantIds: string[]): Promise<WorkItem[]> {
+    const rows = await Promise.all(
+      tenantIds.map((tenantId) =>
+        filters.repoId
+          ? this.repository.listWorkItems(tenantId, filters.repoId, 250)
+          : this.repository.listWorkItemsForTenant(tenantId, 250)
+      )
+    );
+
+    return rows
+      .flat()
+      .map(toWorkItem)
+      .filter((workItem) => matchesFilters(workItem, filters))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, filters.limit);
+  }
+
+  private async getTenant(tenantId: string): Promise<TraceOpsTenant | null> {
+    if (!this.authService) {
+      throw new Error("Tenant membership service is not configured");
+    }
+
+    return (await this.authService.getTenant(tenantId)) || null;
   }
 }

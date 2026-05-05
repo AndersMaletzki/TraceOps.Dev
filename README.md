@@ -161,6 +161,92 @@ curl -sS -X POST 'http://localhost:7071/api/auth/sync-user' \
 
 `POST /api/auth/sync-user` is a trusted backend endpoint. It must be called by the website backend after deriving identity from Azure Static Web Apps auth headers, and it still requires TraceOps API authentication through `x-api-key`. Browser clients must not call it directly without API auth and must not be trusted to choose arbitrary `tenantId` values. The API builds `userKey` as `<identityProvider>|<providerUserId>` instead of using email as the primary identity, creates or updates the user login metadata, ensures `personal~<identityProvider>~<providerUserId>` exists, ensures an `owner` tenant membership exists, and returns `user`, `personalTenant`, and `memberships`.
 
+## Website Proxy Contract
+
+TraceOps.Dev-website is a thin server-side proxy for product data. It calls TraceOps.Dev API with `TRACEOPS_API_BASE_URL` and the raw `TRACEOPS_API_KEY`; browser code must never receive that key and must never read or write TraceOps product tables directly. The TraceOps.Dev API owns users, tenants, tenant memberships, work items, work item events, and tenant-scoped authorization decisions.
+
+All website proxy calls require:
+
+- `x-api-key: <raw TraceOps API key>`
+- `x-traceops-user-key: <identityProvider>|<providerUserId>` for user-scoped app reads
+
+`POST /api/auth/sync-user` accepts only trusted backend identity fields:
+
+```json
+{
+  "identityProvider": "github",
+  "providerUserId": "123456",
+  "userDetails": "octocat@example.com",
+  "displayName": "Octo Cat",
+  "roles": ["authenticated"]
+}
+```
+
+It returns a safe frontend shape:
+
+```json
+{
+  "user": {},
+  "personalTenant": {},
+  "memberships": []
+}
+```
+
+`GET /api/app/workitems` returns work items for the caller after TraceOps.Dev validates tenant membership. `repoId` is optional so the first page load can ask the API for accessible data without first querying storage for repository options.
+
+Query parameters:
+
+- `tenantId` optional; when present, the caller must be a member of that tenant
+- `repoId` optional; when omitted, results span accessible tenant repositories
+- `status`, `severity`, `workItemType`, `category`, `limit` optional filters
+
+Response shape:
+
+```json
+{
+  "caller": { "userKey": "github|123456" },
+  "activeTenant": null,
+  "repoId": null,
+  "repositoryOptions": [
+    { "tenantId": "personal~github~123456", "repoId": "AndersMaletzki/TraceOps.Dev", "label": "AndersMaletzki/TraceOps.Dev" }
+  ],
+  "items": [],
+  "count": 0
+}
+```
+
+Admin metrics endpoints are product-data reads from TraceOps-owned storage and require `x-api-key`:
+
+- `GET /api/admin/metrics/users`
+- `GET /api/admin/metrics/issues`
+
+They also require `x-traceops-user-key` for a TraceOps user whose stored `isAdmin` flag is `true`.
+
+Users metrics response:
+
+```json
+{
+  "totalUsers": 0,
+  "githubUsers": 0,
+  "microsoftUsers": 0,
+  "adminUsers": 0,
+  "usersCreatedLast7Days": 0,
+  "activeUsersLast30Days": 0
+}
+```
+
+Issues metrics response:
+
+```json
+{
+  "totalIssues": 0,
+  "openIssues": 0,
+  "fixedIssues": 0,
+  "closedIssues": 0,
+  "issuesCreatedLast7Days": 0
+}
+```
+
 ## MCP Usage
 
 Example Codex/Claude MCP config:

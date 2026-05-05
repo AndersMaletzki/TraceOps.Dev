@@ -72,11 +72,23 @@ PATCH /workitems/{workItemId}/status
 PATCH /workitems/{workItemId}/claim
 PATCH /workitems/{workItemId}/links
 POST  /auth/sync-user
+GET   /app/workitems
+GET   /admin/metrics/users
+GET   /admin/metrics/issues
 ```
 
-`tenantId` and `repoId` are required for all read/update operations so queries stay inside one Table Storage partition.
+`tenantId` and `repoId` are required for MCP-style repository work item operations so queries stay inside one Table Storage partition. The website-facing `GET /app/workitems` endpoint accepts an optional `repoId`; when omitted, TraceOps.Dev returns work items across accessible tenant repositories and includes `repositoryOptions` from API-owned work item data.
 
 `POST /auth/sync-user` is a trusted backend integration endpoint for the website. The website backend derives the authenticated identity from Azure Static Web Apps auth headers and calls TraceOps with `x-api-key`; browser-provided identity is not trusted. The endpoint creates or updates the user, updates login metadata, stores `isAdmin` when roles contain `admin`, creates a personal tenant when missing, and ensures an owner tenant membership exists.
+
+TraceOps.Dev-website is a thin server-side proxy. It sends `x-api-key` and, for app reads, `x-traceops-user-key` derived from trusted auth context. Browser code never receives `TRACEOPS_API_KEY` and never reads or writes product Table Storage directly. Product authorization belongs in TraceOps.Dev API; the website must not duplicate tenant membership validation as the source of truth.
+
+`GET /app/workitems` validates the caller's tenant membership before returning tenant-scoped data. Its response includes `caller`, `activeTenant`, `repoId`, `repositoryOptions`, `items`, and `count`.
+
+Admin metrics endpoints require `x-api-key` and `x-traceops-user-key` for a stored TraceOps user with `isAdmin = true`. They aggregate from TraceOps-owned storage and return JSON counts only:
+
+- `GET /admin/metrics/users`: `totalUsers`, `githubUsers`, `microsoftUsers`, `adminUsers`, `usersCreatedLast7Days`, `activeUsersLast30Days`
+- `GET /admin/metrics/issues`: `totalIssues`, `openIssues`, `fixedIssues`, `closedIssues`, `issuesCreatedLast7Days`
 
 Website and backend integrations must use stable provider identity, represented by `identityProvider` + `providerUserId`. Email may be stored as user detail or display metadata, but integrations must not use email as the primary identity because emails can change and are not guaranteed to be unique across providers.
 
