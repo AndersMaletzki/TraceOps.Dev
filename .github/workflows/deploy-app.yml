@@ -79,7 +79,6 @@ jobs:
           az functionapp deploy
           --resource-group '${{ inputs.resource_group_name }}'
           --name '${{ inputs.function_app_name }}'
-          --src traceops-api.zip
           --src-path traceops-api.zip
           --type zip
           --restart true
