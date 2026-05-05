@@ -32,6 +32,20 @@ TraceOps.Dev v0.1 supports:
 - audit finding tracking
 - workflow state tracking for AI agents
 
+## Product Data Ownership
+
+TraceOps.Dev owns the product data required to run repository workflow tracking:
+
+- `Users`
+- `Tenants`
+- `TenantMembers`
+- `WorkItems`
+- `WorkItemEvents`
+
+The website, MCP server, and other clients integrate with TraceOps.Dev; they are not the source of truth for users, tenants, tenant membership, work item access, or workflow state.
+
+TraceOps.Dev is open-source friendly. Repository schemas, infrastructure templates, and API contracts can be public. Real user data, tenant data, membership data, secrets, API keys, connection strings, and production identifiers must remain private.
+
 TraceOps.Dev v0.1 does not support:
 
 - branch creation
@@ -64,12 +78,33 @@ POST  /auth/sync-user
 
 `POST /auth/sync-user` is a trusted backend integration endpoint for the website. The website backend derives the authenticated identity from Azure Static Web Apps auth headers and calls TraceOps with `x-api-key`; browser-provided identity is not trusted. The endpoint creates or updates the user, updates login metadata, stores `isAdmin` when roles contain `admin`, creates a personal tenant when missing, and ensures an owner tenant membership exists.
 
+Website and backend integrations must use stable provider identity, represented by `identityProvider` + `providerUserId`. Email may be stored as user detail or display metadata, but integrations must not use email as the primary identity because emails can change and are not guaranteed to be unique across providers.
+
+Browser clients must not be allowed to choose arbitrary tenant access. A trusted backend must derive the caller identity, resolve or verify tenant membership, and pass only authorized `tenantId` values to TraceOps.Dev.
+
+## Access Boundaries
+
+`tenantId` is the product access boundary. Tenant membership controls whether a user can access work items in that tenant.
+
+Work items remain partitioned by `tenantId` + `repoId`:
+
+```text
+TENANT~<tenantId> + REPO~<repoId>
+```
+
+`repoId` isolates repository workflow state inside a tenant, but it is not sufficient for authorization by itself. Access checks are tenant membership checks first, then repository partition selection.
+
+`createdByUserKey` and `assignedToUserKey` are audit and display fields only. They help show who created or is assigned to a work item, but they do not grant access, prove the caller's identity, or replace tenant membership.
+
 ## Storage Design
 
-v0.1 uses two Azure Table Storage tables:
+v0.1 stores product-owned data in Azure Table Storage tables:
 
 - `WorkItems`
 - `WorkItemEvents`
+- `TraceOpsUsers`
+- `TraceOpsTenants`
+- `TraceOpsTenantMembers`
 
 Work item keys:
 
@@ -108,7 +143,9 @@ Work item fields:
 - `createdAt`
 - `updatedAt`
 - `createdBy`
+- `createdByUserKey` (audit/display only)
 - `assignedTo`
+- `assignedToUserKey` (audit/display only)
 - `claimedBy`
 - `claimedAt`
 - `claimExpiresAt`

@@ -16,6 +16,24 @@ audit finding or feature request
 
 v0.1 does not create branches, push commits, open PRs, modify repositories, implement billing, notifications, dashboards, GitHub Apps, or advanced auth.
 
+## Product Ownership Boundaries
+
+TraceOps.Dev owns its product data:
+
+- `Users`
+- `Tenants`
+- `TenantMembers`
+- `WorkItems`
+- `WorkItemEvents`
+
+`tenantId` is the access boundary. Tenant membership controls access to work items, and work items remain partitioned by `tenantId` + `repoId` so repository workflow state is isolated inside a tenant/repository partition.
+
+`createdByUserKey` and `assignedToUserKey` are audit and display fields only. They do not grant tenant access, prove identity, or replace tenant membership checks.
+
+Website and backend integrations must use stable provider identities such as `identityProvider` + `providerUserId`; they must not use email addresses as primary identity keys. Browser clients must not be allowed to choose arbitrary tenant access. A trusted backend must derive the authenticated user and allowed tenants before calling TraceOps.Dev.
+
+TraceOps.Dev remains open-source friendly: schemas, Bicep, and API contracts can be public, but real user data, tenant data, secrets, API keys, connection strings, and production identifiers are not public project data.
+
 ## Structure
 
 ```text
@@ -141,7 +159,7 @@ curl -sS -X POST 'http://localhost:7071/api/auth/sync-user' \
   }'
 ```
 
-`POST /api/auth/sync-user` is a trusted backend endpoint. It must be called by the website backend after deriving identity from Azure Static Web Apps auth headers, and it still requires TraceOps API authentication through `x-api-key`. Browser clients must not call it directly without API auth. The API builds `userKey` as `<identityProvider>|<providerUserId>`, creates or updates the user login metadata, ensures `personal~<identityProvider>~<providerUserId>` exists, ensures an `owner` tenant membership exists, and returns `user`, `personalTenant`, and `memberships`.
+`POST /api/auth/sync-user` is a trusted backend endpoint. It must be called by the website backend after deriving identity from Azure Static Web Apps auth headers, and it still requires TraceOps API authentication through `x-api-key`. Browser clients must not call it directly without API auth and must not be trusted to choose arbitrary `tenantId` values. The API builds `userKey` as `<identityProvider>|<providerUserId>` instead of using email as the primary identity, creates or updates the user login metadata, ensures `personal~<identityProvider>~<providerUserId>` exists, ensures an `owner` tenant membership exists, and returns `user`, `personalTenant`, and `memberships`.
 
 ## MCP Usage
 
@@ -224,6 +242,8 @@ RowKey       = ITEM~<yyyyMMddHHmmss>~<shortId>
 
 `workItemId` is the full work item RowKey. Clients treat it as opaque.
 
+Access to work items is bounded by `tenantId`. A caller may read or update work items only when the caller is a member of the tenant. `repoId` narrows the storage partition inside the tenant; it is not an access boundary by itself.
+
 Work item fields:
 
 - `tenantId`
@@ -241,9 +261,9 @@ Work item fields:
 - `createdAt`
 - `updatedAt`
 - `createdBy`
-- `createdByUserKey` (optional, audit/display only)
+- `createdByUserKey` (optional, audit/display only; not an access control field)
 - `assignedTo`
-- `assignedToUserKey` (optional, audit/display only)
+- `assignedToUserKey` (optional, audit/display only; not an access control field)
 - `claimedBy`
 - `claimedAt`
 - `claimExpiresAt`
@@ -304,9 +324,9 @@ Event types:
 - `Assigned`
 - `CommentAdded`
 
-Users, tenants, and tenant membership are product-owned data in TraceOps.Dev. The website is not the source of truth for users or tenants.
+Users, tenants, tenant membership, work items, and work item events are product-owned data in TraceOps.Dev. The website is not the source of truth for users, tenants, tenant membership, or work item access.
 
-The website syncs authenticated users through `POST /api/auth/sync-user`. The website backend must derive `identityProvider`, `providerUserId`, `userDetails`, `displayName`, and `roles` from trusted Azure Static Web Apps auth headers before calling the TraceOps API with `x-api-key`.
+The website syncs authenticated users through `POST /api/auth/sync-user`. The website backend must derive `identityProvider`, `providerUserId`, `userDetails`, `displayName`, and `roles` from trusted Azure Static Web Apps auth headers before calling the TraceOps API with `x-api-key`. Email addresses may be stored for contact or display metadata, but they must not be used as primary identity keys.
 
 Users are stored in the `TraceOpsUsers` table:
 
@@ -368,3 +388,5 @@ Allowed tenant member roles:
 - `admin`
 - `member`
 - `viewer`
+
+Tenant membership controls access to work items. Browser clients may request work items for a tenant only through a trusted backend path that verifies the caller's membership; they must not be able to grant themselves tenant access by submitting a `tenantId`.
