@@ -123,7 +123,9 @@ export function toWorkItem(entity: StoredWorkItemResult): WorkItem {
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
     createdBy: entity.createdBy,
+    createdByUserKey: entity.createdByUserKey || "",
     assignedTo: entity.assignedTo || "",
+    assignedToUserKey: entity.assignedToUserKey || "",
     claimedBy: entity.claimedBy || "",
     claimedAt: entity.claimedAt || "",
     claimExpiresAt: entity.claimExpiresAt || "",
@@ -152,7 +154,9 @@ export function toStoredWorkItem(input: CreateWorkItemInput, workItemId: string,
     createdAt: now,
     updatedAt: now,
     createdBy: input.createdBy,
+    createdByUserKey: input.createdByUserKey || "",
     assignedTo: input.assignedTo || "",
+    assignedToUserKey: input.assignedToUserKey || "",
     claimedBy: "",
     claimedAt: "",
     claimExpiresAt: "",
@@ -412,6 +416,23 @@ export class TenantMemberRepository {
   async listTenantMembers(tenantId: string, limit = 100): Promise<TraceOpsTenantMember[]> {
     const members: TraceOpsTenantMember[] = [];
     const filter = odata`PartitionKey eq ${tenantMemberPartitionKey(tenantId)}`;
+
+    for await (const entity of this.tenantMembersClient.listEntities<StoredTraceOpsTenantMemberResult>({
+      queryOptions: { filter }
+    })) {
+      members.push(toTenantMember(entity));
+
+      if (members.length >= limit) {
+        break;
+      }
+    }
+
+    return members;
+  }
+
+  async listTenantMembershipsForUser(userKey: string, limit = 100): Promise<TraceOpsTenantMember[]> {
+    const members: TraceOpsTenantMember[] = [];
+    const filter = odata`RowKey eq ${tenantMemberRowKey(userKey)}`;
 
     for await (const entity of this.tenantMembersClient.listEntities<StoredTraceOpsTenantMemberResult>({
       queryOptions: { filter }

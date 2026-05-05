@@ -22,7 +22,10 @@ describe("parseCreateWorkItemInput", () => {
       source: "audit",
       files: [" api/index.ts ", ""],
       tags: ["security"],
-      createdBy: "codex"
+      createdBy: "codex",
+      createdByUserKey: " github|123456 ",
+      assignedTo: "maintainer",
+      assignedToUserKey: " github|789 "
     });
 
     expect(input).toMatchObject({
@@ -30,7 +33,10 @@ describe("parseCreateWorkItemInput", () => {
       repoId: "repo",
       status: undefined,
       files: ["api/index.ts"],
-      tags: ["security"]
+      tags: ["security"],
+      createdByUserKey: "github|123456",
+      assignedTo: "maintainer",
+      assignedToUserKey: "github|789"
     });
   });
 

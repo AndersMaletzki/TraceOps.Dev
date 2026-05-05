@@ -54,6 +54,8 @@ function testWorkItem(overrides: Partial<WorkItem> = {}): WorkItem {
     tags: [],
     createdAt: "2026-05-01T00:00:00.000Z",
     createdBy: "codex",
+    createdByUserKey: "github|123456",
+    assignedToUserKey: "",
     claimedAt: "",
     ...overrides
   };

@@ -28,7 +28,10 @@ describe("storage mapping", () => {
         source: "manual",
         files: ["docs/architecture.md"],
         tags: ["audit"],
-        createdBy: "codex"
+        createdBy: "codex",
+        createdByUserKey: "github|123456",
+        assignedTo: "maintainer",
+        assignedToUserKey: "github|789"
       },
       "ITEM~20260501153000~abc123",
       "2026-05-01T15:30:00.000Z"
@@ -38,8 +41,15 @@ describe("storage mapping", () => {
     expect(stored.partitionKey).toBe("TENANT~dGVuYW50~REPO~cmVwbw");
     expect(stored.rowKey).toBe("ITEM~20260501153000~abc123");
     expect(stored.files).toBe("[\"docs/architecture.md\"]");
+    expect(stored.createdByUserKey).toBe("github|123456");
+    expect(stored.assignedToUserKey).toBe("github|789");
     expect(toWorkItem(stored).files).toEqual(["docs/architecture.md"]);
     expect(toWorkItem(stored).tags).toEqual(["audit"]);
+    expect(toWorkItem(stored)).toMatchObject({
+      createdByUserKey: "github|123456",
+      assignedTo: "maintainer",
+      assignedToUserKey: "github|789"
+    });
   });
 
   it("creates Azure Table-safe partition keys", () => {
@@ -64,6 +74,8 @@ describe("storage mapping", () => {
     );
 
     delete stored.assignedTo;
+    delete stored.createdByUserKey;
+    delete stored.assignedToUserKey;
     delete stored.claimedBy;
     delete stored.claimedAt;
     delete stored.claimExpiresAt;
@@ -73,6 +85,8 @@ describe("storage mapping", () => {
 
     expect(toWorkItem(stored)).toMatchObject({
       assignedTo: "",
+      createdByUserKey: "",
+      assignedToUserKey: "",
       claimedBy: "",
       claimedAt: "",
       claimExpiresAt: "",

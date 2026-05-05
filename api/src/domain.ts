@@ -91,7 +91,9 @@ export type WorkItem = {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+  createdByUserKey?: string;
   assignedTo: string;
+  assignedToUserKey?: string;
   claimedBy: string;
   claimedAt: string;
   claimExpiresAt: string;
@@ -113,7 +115,9 @@ export type CreateWorkItemInput = {
   files?: string[];
   tags?: string[];
   createdBy: string;
+  createdByUserKey?: string;
   assignedTo?: string;
+  assignedToUserKey?: string;
   externalBranchName?: string;
   externalCommitUrl?: string;
   externalPrUrl?: string;
@@ -122,6 +126,7 @@ export type CreateWorkItemInput = {
 export type WorkItemFilters = {
   tenantId: string;
   repoId: string;
+  callerUserKey?: string;
   status?: WorkItemStatus;
   severity?: WorkItemSeverity;
   workItemType?: WorkItemType;

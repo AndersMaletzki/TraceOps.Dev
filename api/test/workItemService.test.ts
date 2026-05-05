@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TenantAccessDeniedError } from "../src/authService.js";
 import { CreateWorkItemInput } from "../src/domain.js";
 import { StoredWorkItemResult, toStoredWorkItem, toWorkItem, WorkItemConflictError, WorkItemRepository } from "../src/storage.js";
 import { WorkItemService } from "../src/workItemService.js";
@@ -52,6 +53,88 @@ describe("WorkItemService", () => {
         actor: "codex"
       })
     );
+  });
+
+  it("allows a tenant member to list tenant work items", async () => {
+    const repository = {
+      listWorkItems: vi.fn(async () => [createStored()])
+    } as unknown as WorkItemRepository;
+    const authService = {
+      assertTenantMember: vi.fn(async () => undefined),
+      listUserTenants: vi.fn()
+    };
+
+    const service = new WorkItemService(repository, authService);
+    const items = await service.list({
+      tenantId: "tenant",
+      repoId: "repo",
+      callerUserKey: "github|123456",
+      limit: 25
+    });
+
+    expect(items).toHaveLength(1);
+    expect(authService.assertTenantMember).toHaveBeenCalledWith("github|123456", "tenant");
+    expect(repository.listWorkItems).toHaveBeenCalledWith("tenant", "repo", 250);
+  });
+
+  it("rejects a non-member before listing tenant work items", async () => {
+    const repository = {
+      listWorkItems: vi.fn()
+    } as unknown as WorkItemRepository;
+    const authService = {
+      assertTenantMember: vi.fn(async () => {
+        throw new TenantAccessDeniedError("tenant");
+      }),
+      listUserTenants: vi.fn()
+    };
+
+    const service = new WorkItemService(repository, authService);
+
+    await expect(
+      service.list({
+        tenantId: "tenant",
+        repoId: "repo",
+        callerUserKey: "github|other",
+        limit: 25
+      })
+    ).rejects.toThrow(TenantAccessDeniedError);
+    expect(repository.listWorkItems).not.toHaveBeenCalled();
+  });
+
+  it("keeps API-key-only listing working when no caller user key is supplied", async () => {
+    const repository = {
+      listWorkItems: vi.fn(async () => [createStored()])
+    } as unknown as WorkItemRepository;
+    const authService = {
+      assertTenantMember: vi.fn(),
+      listUserTenants: vi.fn()
+    };
+
+    const service = new WorkItemService(repository, authService);
+    const items = await service.list({
+      tenantId: "tenant",
+      repoId: "repo",
+      limit: 25
+    });
+
+    expect(items).toHaveLength(1);
+    expect(authService.assertTenantMember).not.toHaveBeenCalled();
+  });
+
+  it("validates tenant membership before reading one work item", async () => {
+    const repository = {
+      getWorkItem: vi.fn(async () => createStored())
+    } as unknown as WorkItemRepository;
+    const authService = {
+      assertTenantMember: vi.fn(async () => undefined),
+      listUserTenants: vi.fn()
+    };
+
+    const service = new WorkItemService(repository, authService);
+    const item = await service.get("tenant", "repo", "ITEM~20260501153000~abc123", "github|123456");
+
+    expect(item.workItemId).toBe("ITEM~20260501153000~abc123");
+    expect(authService.assertTenantMember).toHaveBeenCalledWith("github|123456", "tenant");
   });
 
   it("writes an append-only event when status changes", async () => {

@@ -9,6 +9,7 @@ import {
   WorkItemEvent,
   WorkItemFilters
 } from "./domain.js";
+import type { AuthService } from "./authService.js";
 import {
   applyLinks,
   StoredWorkItemResult,
@@ -123,7 +124,10 @@ export function buildLinksUpdatedEvent(workItem: WorkItem, now: string, eventId:
 }
 
 export class WorkItemService {
-  constructor(private readonly repository: WorkItemRepository) {}
+  constructor(
+    private readonly repository: WorkItemRepository,
+    private readonly authService?: Pick<AuthService, "assertTenantMember" | "listUserTenants">
+  ) {}
 
   async create(input: CreateWorkItemInput): Promise<WorkItem> {
     const now = isoNow();
@@ -134,6 +138,8 @@ export class WorkItemService {
   }
 
   async list(filters: WorkItemFilters): Promise<WorkItem[]> {
+    await this.assertTenantAccess(filters.callerUserKey, filters.tenantId);
+
     const entities = await this.repository.listWorkItems(filters.tenantId, filters.repoId, 250);
     return entities
       .map(toWorkItem)
@@ -141,7 +147,9 @@ export class WorkItemService {
       .slice(0, filters.limit);
   }
 
-  async get(tenantId: string, repoId: string, workItemId: string): Promise<WorkItem> {
+  async get(tenantId: string, repoId: string, workItemId: string, callerUserKey?: string): Promise<WorkItem> {
+    await this.assertTenantAccess(callerUserKey, tenantId);
+
     return toWorkItem(await this.repository.getWorkItem(tenantId, repoId, workItemId));
   }
 
@@ -152,6 +160,14 @@ export class WorkItemService {
     return chooseNextWorkItem(
       items.filter((workItem) => candidateStatuses.includes(workItem.status))
     );
+  }
+
+  async listUserTenants(userKey: string) {
+    if (!this.authService) {
+      throw new Error("Tenant membership service is not configured");
+    }
+
+    return this.authService.listUserTenants(userKey);
   }
 
   async updateStatus(workItemId: string, input: UpdateStatusInput): Promise<WorkItem> {
@@ -211,5 +227,17 @@ export class WorkItemService {
     await this.repository.createEvent(buildLinksUpdatedEvent(updatedWorkItem, now, newEventId()));
 
     return updatedWorkItem;
+  }
+
+  private async assertTenantAccess(callerUserKey: string | undefined, tenantId: string): Promise<void> {
+    if (!callerUserKey) {
+      return;
+    }
+
+    if (!this.authService) {
+      throw new Error("Tenant membership service is not configured");
+    }
+
+    await this.authService.assertTenantMember(callerUserKey, tenantId);
   }
 }

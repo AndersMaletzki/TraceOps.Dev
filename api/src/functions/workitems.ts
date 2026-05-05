@@ -1,9 +1,12 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { AuthService } from "../authService.js";
 import { getConfig, TraceOpsConfig } from "../config.js";
 import {
   authenticate,
   errorResponse,
   json,
+  parseAppWorkItemFiltersFromQuery,
+  parseCallerUserKey,
   parseClaimBody,
   parseFiltersFromQuery,
   parseLinksBody,
@@ -11,7 +14,7 @@ import {
   parseUpdateStatusBody,
   readJson
 } from "../http.js";
-import { WorkItemRepository } from "../storage.js";
+import { TenantMemberRepository, TenantRepository, UserRepository, WorkItemRepository } from "../storage.js";
 import { parseCreateWorkItemInput } from "../validation.js";
 import { WorkItemService } from "../workItemService.js";
 
@@ -21,13 +24,30 @@ let cachedService: WorkItemService | undefined;
 function getService(): { config: TraceOpsConfig; service: WorkItemService } {
   if (!cachedConfig || !cachedService) {
     cachedConfig = getConfig();
-    cachedService = new WorkItemService(new WorkItemRepository(cachedConfig));
+    const authService = new AuthService(
+      new UserRepository(cachedConfig),
+      new TenantRepository(cachedConfig),
+      new TenantMemberRepository(cachedConfig)
+    );
+    cachedService = new WorkItemService(new WorkItemRepository(cachedConfig), authService);
   }
 
   return {
     config: cachedConfig,
     service: cachedService
   };
+}
+
+async function handleApp(
+  request: HttpRequest,
+  operation: (service: WorkItemService) => Promise<HttpResponseInit>
+): Promise<HttpResponseInit> {
+  try {
+    const { service } = getService();
+    return await operation(service);
+  } catch (error) {
+    return errorResponse(error);
+  }
 }
 
 async function handle(
@@ -78,7 +98,7 @@ export async function getWorkItem(
     const tenantId = request.query.get("tenantId");
     const repoId = request.query.get("repoId");
     const body = parseTenantRepoBody({ tenantId, repoId });
-    const workItem = await service.get(body.tenantId, body.repoId, workItemId);
+    const workItem = await service.get(body.tenantId, body.repoId, workItemId, parseCallerUserKey(request));
     return json(200, workItem);
   });
 }
@@ -123,6 +143,38 @@ export async function updateWorkItemLinks(
     const body = await readJson(request);
     const workItem = await service.updateLinks(request.params.workItemId, parseLinksBody(body));
     return json(200, workItem);
+  });
+}
+
+export async function listAppWorkItems(
+  request: HttpRequest,
+  _context: InvocationContext
+): Promise<HttpResponseInit> {
+  return handleApp(request, async (service) => {
+    const filters = parseAppWorkItemFiltersFromQuery(request);
+
+    if (filters.tenantId) {
+      const workItems = await service.list({
+        ...filters,
+        tenantId: filters.tenantId
+      });
+      return json(200, { items: workItems, count: workItems.length });
+    }
+
+    const memberships = await service.listUserTenants(filters.callerUserKey);
+    const perTenantLimit = filters.limit;
+    const tenantResults = await Promise.all(
+      memberships.map((membership) =>
+        service.list({
+          ...filters,
+          tenantId: membership.tenantId,
+          limit: perTenantLimit
+        })
+      )
+    );
+    const workItems = tenantResults.flat().slice(0, filters.limit);
+
+    return json(200, { items: workItems, count: workItems.length });
   });
 }
 
@@ -173,4 +225,11 @@ app.http("updateWorkItemLinks", {
   authLevel: "anonymous",
   route: "workitems/{workItemId}/links",
   handler: updateWorkItemLinks
+});
+
+app.http("listAppWorkItems", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "app/workitems",
+  handler: listAppWorkItems
 });

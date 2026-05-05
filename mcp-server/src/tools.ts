@@ -34,6 +34,7 @@ function summarize(workItem: WorkItem): WorkItemSummary {
     severity: workItem.severity,
     status: workItem.status,
     assignedTo: workItem.assignedTo,
+    assignedToUserKey: workItem.assignedToUserKey,
     claimedBy: workItem.claimedBy,
     claimExpiresAt: workItem.claimExpiresAt,
     updatedAt: workItem.updatedAt,
@@ -110,7 +111,9 @@ export function registerTraceOpsTools(
       files: z.array(z.string()).default([]),
       tags: z.array(z.string()).default([]),
       createdBy: z.string().min(1),
+      createdByUserKey: z.string().optional(),
       assignedTo: z.string().optional(),
+      assignedToUserKey: z.string().optional(),
       externalBranchName: z.string().optional(),
       externalCommitUrl: z.string().optional(),
       externalPrUrl: z.string().optional()

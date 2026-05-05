@@ -145,7 +145,9 @@ export function parseCreateWorkItemInput(value: unknown): CreateWorkItemInput {
     files: optionalStringArray(body.files, "files"),
     tags: optionalStringArray(body.tags, "tags"),
     createdBy: requiredString(body.createdBy, "createdBy"),
+    createdByUserKey: optionalString(body.createdByUserKey, "createdByUserKey"),
     assignedTo: optionalString(body.assignedTo, "assignedTo"),
+    assignedToUserKey: optionalString(body.assignedToUserKey, "assignedToUserKey"),
     externalBranchName: optionalString(body.externalBranchName, "externalBranchName"),
     externalCommitUrl: optionalString(body.externalCommitUrl, "externalCommitUrl"),
     externalPrUrl: optionalString(body.externalPrUrl, "externalPrUrl")

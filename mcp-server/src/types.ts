@@ -34,6 +34,7 @@ export type WorkItemSummary = {
   severity: WorkItemSeverity;
   status: WorkItemStatus;
   assignedTo: string;
+  assignedToUserKey?: string;
   claimedBy: string;
   claimExpiresAt: string;
   updatedAt: string;
@@ -51,6 +52,7 @@ export type WorkItem = WorkItemSummary & {
   tags: string[];
   createdAt: string;
   createdBy: string;
+  createdByUserKey?: string;
   claimedAt: string;
 };
 

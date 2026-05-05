@@ -17,7 +17,7 @@ type UserStore = Pick<UserRepository, "createUser" | "getUser" | "upsertUser">;
 type TenantStore = Pick<TenantRepository, "createTenant" | "getTenant">;
 type TenantMemberStore = Pick<
   TenantMemberRepository,
-  "createTenantMember" | "getTenantMember" | "listTenantMembers"
+  "createTenantMember" | "getTenantMember" | "listTenantMembers" | "listTenantMembershipsForUser"
 >;
 
 function isoNow(date = new Date()): string {
@@ -47,6 +47,13 @@ async function getOrUndefined<T>(operation: () => Promise<T>): Promise<T | undef
     }
 
     throw error;
+  }
+}
+
+export class TenantAccessDeniedError extends Error {
+  constructor(tenantId: string) {
+    super(`User is not a member of tenant: ${tenantId}`);
+    this.name = "TenantAccessDeniedError";
   }
 }
 
@@ -81,6 +88,18 @@ export class AuthService {
       personalTenant,
       memberships
     };
+  }
+
+  async assertTenantMember(userKey: string, tenantId: string): Promise<void> {
+    const membership = await getOrUndefined(() => this.tenantMembers.getTenantMember(tenantId, userKey));
+
+    if (!membership) {
+      throw new TenantAccessDeniedError(tenantId);
+    }
+  }
+
+  async listUserTenants(userKey: string): Promise<TraceOpsTenantMember[]> {
+    return this.tenantMembers.listTenantMembershipsForUser(userKey);
   }
 
   private async upsertSyncedUser(

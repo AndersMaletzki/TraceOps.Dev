@@ -15,5 +15,6 @@
     "audit",
     "security"
   ],
-  "createdBy": "codex"
+  "createdBy": "codex",
+  "createdByUserKey": "github|123456"
 }

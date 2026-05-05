@@ -241,7 +241,9 @@ Work item fields:
 - `createdAt`
 - `updatedAt`
 - `createdBy`
+- `createdByUserKey` (optional, audit/display only)
 - `assignedTo`
+- `assignedToUserKey` (optional, audit/display only)
 - `claimedBy`
 - `claimedAt`
 - `claimExpiresAt`

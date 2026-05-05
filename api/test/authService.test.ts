@@ -60,7 +60,9 @@ function createStores() {
       return membership;
     },
     listTenantMembers: async (tenantId: string) =>
-      [...memberships.values()].filter((membership) => membership.tenantId === tenantId)
+      [...memberships.values()].filter((membership) => membership.tenantId === tenantId),
+    listTenantMembershipsForUser: async (userKey: string) =>
+      [...memberships.values()].filter((membership) => membership.userKey === userKey)
   } as unknown as TenantMemberRepository;
 
   return {

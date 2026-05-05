@@ -13,5 +13,7 @@
     "workflow",
     "mvp"
   ],
-  "createdBy": "maintainer"
+  "createdBy": "maintainer",
+  "createdByUserKey": "github|123456",
+  "assignedToUserKey": "github|789012"
 }
