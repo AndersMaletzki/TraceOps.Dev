@@ -64,21 +64,52 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Package API
+      - name: Assemble API deployment package
         run: |
           set -euo pipefail
-          rm -rf api-package traceops-api.zip
-          mkdir api-package
-          cp -R api/dist api/host.json api/package.json node_modules api-package/
-          rm -rf api-package/node_modules/@traceops
-          cd api-package
-          zip -r ../traceops-api.zip .
+          rm -rf deploy api-package traceops-api.zip
+          mkdir deploy
+          cp -R api/dist deploy/dist
+          cp api/host.json deploy/host.json
+          cp api/package.json deploy/package.json
+          cp -R node_modules deploy/node_modules
+          rm -rf deploy/node_modules/@traceops
 
-      - name: Deploy API with One Deploy
-        run: >
-          az functionapp deploy
-          --resource-group '${{ inputs.resource_group_name }}'
-          --name '${{ inputs.function_app_name }}'
-          --src-path traceops-api.zip
-          --type zip
-          --restart true
+      - name: Deploy API
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ inputs.function_app_name }}
+          package: ./deploy
+
+      - name: Verify deployed API routes
+        run: |
+          set -euo pipefail
+
+          base_url="https://${{ inputs.function_app_name }}.azurewebsites.net"
+          routes=(
+            "/api/admin/metrics/users"
+            "/api/admin/metrics/issues"
+            "/api/app/workitems"
+          )
+
+          for route in "${routes[@]}"; do
+            status="000"
+
+            for attempt in {1..12}; do
+              status="$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" "${base_url}${route}")"
+
+              if [ "$status" != "404" ]; then
+                break
+              fi
+
+              echo "Route ${route} returned HTTP 404 on attempt ${attempt}; retrying."
+              sleep 10
+            done
+
+            if [ "$status" = "404" ]; then
+              echo "::error::Route ${route} returned HTTP 404 after deployment."
+              exit 1
+            fi
+
+            echo "Route ${route} returned HTTP ${status}."
+          done
