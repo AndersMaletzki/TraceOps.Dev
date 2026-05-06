@@ -67,7 +67,7 @@ jobs:
       - name: Assemble API deployment package
         run: |
           set -euo pipefail
-          rm -rf deploy api-package traceops-api.zip
+          rm -rf deploy
           mkdir deploy
           cp -R api/dist deploy/dist
           cp api/host.json deploy/host.json
@@ -81,14 +81,21 @@ jobs:
           app-name: ${{ inputs.function_app_name }}
           package: ./deploy
 
+      - name: Restart Function App
+        run: |
+          set -euo pipefail
+          az functionapp restart \
+            --resource-group '${{ inputs.resource_group_name }}' \
+            --name '${{ inputs.function_app_name }}'
+
       - name: Verify deployed API routes
         run: |
           set -euo pipefail
 
           base_url="https://${{ inputs.function_app_name }}.azurewebsites.net"
           routes=(
-            "/api/admin/metrics/users"
-            "/api/admin/metrics/issues"
+            "/api/app/admin/metrics/users"
+            "/api/app/admin/metrics/issues"
             "/api/app/workitems"
           )
 

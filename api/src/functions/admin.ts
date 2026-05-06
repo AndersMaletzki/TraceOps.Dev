@@ -60,13 +60,13 @@ export async function getIssueMetrics(
 app.http("getUserMetrics", {
   methods: ["GET"],
   authLevel: "anonymous",
-  route: "admin/metrics/users",
+  route: "app/admin/metrics/users",
   handler: getUserMetrics
 });
 
 app.http("getIssueMetrics", {
   methods: ["GET"],
   authLevel: "anonymous",
-  route: "admin/metrics/issues",
+  route: "app/admin/metrics/issues",
   handler: getIssueMetrics
 });

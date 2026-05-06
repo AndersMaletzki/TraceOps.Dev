@@ -73,8 +73,8 @@ PATCH /workitems/{workItemId}/claim
 PATCH /workitems/{workItemId}/links
 POST  /auth/sync-user
 GET   /app/workitems
-GET   /admin/metrics/users
-GET   /admin/metrics/issues
+GET   /app/admin/metrics/users
+GET   /app/admin/metrics/issues
 ```
 
 `tenantId` and `repoId` are required for MCP-style repository work item operations so queries stay inside one Table Storage partition. The website-facing `GET /app/workitems` endpoint accepts an optional `repoId`; when omitted, TraceOps.Dev returns work items across accessible tenant repositories and includes `repositoryOptions` from API-owned work item data.
@@ -87,8 +87,8 @@ TraceOps.Dev-website is a thin server-side proxy. It sends `x-api-key` and, for 
 
 Admin metrics endpoints require `x-api-key` and `x-traceops-user-key` for a stored TraceOps user with `isAdmin = true`. They aggregate from TraceOps-owned storage and return JSON counts only:
 
-- `GET /admin/metrics/users`: `totalUsers`, `githubUsers`, `microsoftUsers`, `adminUsers`, `usersCreatedLast7Days`, `activeUsersLast30Days`
-- `GET /admin/metrics/issues`: `totalIssues`, `openIssues`, `fixedIssues`, `closedIssues`, `issuesCreatedLast7Days`
+- `GET /app/admin/metrics/users`: `totalUsers`, `githubUsers`, `microsoftUsers`, `adminUsers`, `usersCreatedLast7Days`, `activeUsersLast30Days`
+- `GET /app/admin/metrics/issues`: `totalIssues`, `openIssues`, `fixedIssues`, `closedIssues`, `issuesCreatedLast7Days`
 
 Website and backend integrations must use stable provider identity, represented by `identityProvider` + `providerUserId`. Email may be stored as user detail or display metadata, but integrations must not use email as the primary identity because emails can change and are not guaranteed to be unique across providers.
 
