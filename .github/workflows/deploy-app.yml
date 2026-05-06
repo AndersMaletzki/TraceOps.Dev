@@ -96,6 +96,7 @@ jobs:
           routes=(
             "/api/app/admin/metrics/users"
             "/api/app/admin/metrics/issues"
+            "/api/app/admin/metrics/requests"
             "/api/app/workitems"
           )
 

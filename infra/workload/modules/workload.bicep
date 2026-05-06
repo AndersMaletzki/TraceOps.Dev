@@ -173,6 +173,10 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
           value: storageConnectionString
         }
         {
+          name: 'AzureWebJobsFeatureFlags'
+          value: 'EnableWorkerIndexing'
+        }
+        {
           name: 'TRACEOPS_API_KEY'
           value: traceOpsApiKey
         }
