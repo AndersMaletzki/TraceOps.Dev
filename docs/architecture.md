@@ -90,7 +90,7 @@ Admin metrics endpoints require `x-api-key` and `x-traceops-user-key` for a stor
 
 - `GET /app/admin/metrics/users`: `totalUsers`, `githubUsers`, `microsoftUsers`, `adminUsers`, `usersCreatedLast7Days`, `activeUsersLast30Days`
 - `GET /app/admin/metrics/issues`: `totalIssues`, `openIssues`, `fixedIssues`, `closedIssues`, `issuesCreatedLast7Days`
-- `GET /app/admin/metrics/requests`: `totalRequests`, `failedRequests`, `averageResponseTimeMs`
+- `GET /app/admin/metrics/requests`: `requestsToday`, `requestsLast7Days`, `failedRequests`, `averageResponseDurationMs`
 
 Website and backend integrations must use stable provider identity, represented by `identityProvider` + `providerUserId`. Email may be stored as user detail or display metadata, but integrations must not use email as the primary identity because emails can change and are not guaranteed to be unique across providers.
 

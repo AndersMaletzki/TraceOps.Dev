@@ -252,9 +252,10 @@ Requests metrics response:
 
 ```json
 {
-  "totalRequests": 0,
+  "requestsToday": 0,
+  "requestsLast7Days": 0,
   "failedRequests": 0,
-  "averageResponseTimeMs": 0
+  "averageResponseDurationMs": 0
 }
 ```
 

@@ -102,32 +102,45 @@ describe("AdminMetricsService", () => {
       { listAllWorkItems: async () => [] },
       {
         getRequestMetrics: async () => ({
-          totalRequests: 42,
+          requestsToday: 12,
+          requestsLast7Days: 42,
           failedRequests: 3,
-          averageResponseTimeMs: 128.5
+          averageResponseDurationMs: 128.5
         })
       },
       "workspace-id"
     );
 
     await expect(service.getRequestMetrics()).resolves.toEqual({
-      totalRequests: 42,
+      requestsToday: 12,
+      requestsLast7Days: 42,
       failedRequests: 3,
-      averageResponseTimeMs: 128.5
+      averageResponseDurationMs: 128.5
+    });
+  });
+
+  it("maps request metrics from Application Insights query results", () => {
+    expect(requestMetricsFromLogsResult({ status: "Success", tables: [{ rows: [[12, 42, 3, 128.5]] }] })).toEqual({
+      requestsToday: 12,
+      requestsLast7Days: 42,
+      failedRequests: 3,
+      averageResponseDurationMs: 128.5
     });
   });
 
   it("normalizes empty request telemetry to zero metrics", () => {
-    expect(requestMetricsFromLogsResult({ status: "Success", tables: [{ rows: [[0, 0, null]] }] })).toEqual({
-      totalRequests: 0,
+    expect(requestMetricsFromLogsResult({ status: "Success", tables: [{ rows: [[0, 0, 0, null]] }] })).toEqual({
+      requestsToday: 0,
+      requestsLast7Days: 0,
       failedRequests: 0,
-      averageResponseTimeMs: 0
+      averageResponseDurationMs: 0
     });
 
     expect(requestMetricsFromLogsResult({ status: "Success", tables: [] })).toEqual({
-      totalRequests: 0,
+      requestsToday: 0,
+      requestsLast7Days: 0,
       failedRequests: 0,
-      averageResponseTimeMs: 0
+      averageResponseDurationMs: 0
     });
   });
 

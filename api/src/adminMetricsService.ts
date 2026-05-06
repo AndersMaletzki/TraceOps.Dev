@@ -58,9 +58,10 @@ export class AzureMonitorRequestTelemetryStore implements RequestTelemetryStore 
       `
 AppRequests
 | summarize
-    totalRequests = sum(ItemCount),
+    requestsToday = sumif(ItemCount, TimeGenerated >= startofday(now())),
+    requestsLast7Days = sum(ItemCount),
     failedRequests = sumif(ItemCount, Success == false),
-    averageResponseTimeMs = avg(DurationMs)
+    averageResponseDurationMs = avg(DurationMs)
 `,
       { duration: "P7D" }
     );
@@ -81,9 +82,10 @@ export function requestMetricsFromLogsResult(result: LogsQuerySuccess): RequestM
   const row = result.tables?.[0]?.rows[0] ?? [];
 
   return {
-    totalRequests: wholeMetric(row[0]),
-    failedRequests: wholeMetric(row[1]),
-    averageResponseTimeMs: finiteMetric(row[2])
+    requestsToday: wholeMetric(row[0]),
+    requestsLast7Days: wholeMetric(row[1]),
+    failedRequests: wholeMetric(row[2]),
+    averageResponseDurationMs: finiteMetric(row[3])
   };
 }
 

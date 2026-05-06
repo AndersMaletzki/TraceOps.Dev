@@ -180,9 +180,10 @@ export type IssueMetrics = {
 };
 
 export type RequestMetrics = {
-  totalRequests: number;
+  requestsToday: number;
+  requestsLast7Days: number;
   failedRequests: number;
-  averageResponseTimeMs: number;
+  averageResponseDurationMs: number;
 };
 
 export type UpdateStatusInput = {
