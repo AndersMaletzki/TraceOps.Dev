@@ -40,4 +40,14 @@ describe("website-facing endpoint authentication", () => {
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });
+
+  it("requires x-api-key for admin request metrics", async () => {
+    process.env.TRACEOPS_API_KEY = localDevKeyHash;
+    process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
+    const { getRequestMetrics } = await import("../src/functions/admin.js");
+
+    const response = await getRequestMetrics(request(), {} as never);
+
+    expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
+  });
 });

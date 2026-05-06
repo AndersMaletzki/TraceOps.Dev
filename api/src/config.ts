@@ -8,6 +8,7 @@ export type TraceOpsConfig = {
   usersTableName: string;
   tenantsTableName: string;
   tenantMembersTableName: string;
+  logAnalyticsWorkspaceId?: string;
 };
 
 export function getConfig(env: NodeJS.ProcessEnv = process.env): TraceOpsConfig {
@@ -29,6 +30,7 @@ export function getConfig(env: NodeJS.ProcessEnv = process.env): TraceOpsConfig 
     workItemEventsTableName: env.TRACEOPS_TABLE_WORKITEM_EVENTS || "WorkItemEvents",
     usersTableName: env.TRACEOPS_TABLE_USERS || "TraceOpsUsers",
     tenantsTableName: env.TRACEOPS_TABLE_TENANTS || "TraceOpsTenants",
-    tenantMembersTableName: env.TRACEOPS_TABLE_TENANT_MEMBERS || "TraceOpsTenantMembers"
+    tenantMembersTableName: env.TRACEOPS_TABLE_TENANT_MEMBERS || "TraceOpsTenantMembers",
+    logAnalyticsWorkspaceId: env.TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID?.trim() || undefined
   };
 }

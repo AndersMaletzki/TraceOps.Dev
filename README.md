@@ -215,10 +215,11 @@ Response shape:
 }
 ```
 
-Admin metrics endpoints are product-data reads from TraceOps-owned storage and require `x-api-key`:
+Admin metrics endpoints require `x-api-key`:
 
-- `GET /api/admin/metrics/users`
-- `GET /api/admin/metrics/issues`
+- `GET /api/app/admin/metrics/users`
+- `GET /api/app/admin/metrics/issues`
+- `GET /api/app/admin/metrics/requests`
 
 They also require `x-traceops-user-key` for a TraceOps user whose stored `isAdmin` flag is `true`.
 
@@ -246,6 +247,18 @@ Issues metrics response:
   "issuesCreatedLast7Days": 0
 }
 ```
+
+Requests metrics response:
+
+```json
+{
+  "totalRequests": 0,
+  "failedRequests": 0,
+  "averageResponseTimeMs": 0
+}
+```
+
+Request metrics are read from Application Insights request telemetry in the attached Log Analytics workspace over a rolling 7 day window. The Function App uses its managed identity to query Azure Monitor Logs.
 
 ## MCP Usage
 

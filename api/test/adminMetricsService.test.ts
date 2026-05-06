@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { AdminAccessDeniedError, AdminMetricsService } from "../src/adminMetricsService.js";
+import {
+  AdminAccessDeniedError,
+  AdminMetricsService,
+  requestMetricsFromLogsResult
+} from "../src/adminMetricsService.js";
 import { CreateWorkItemInput, TraceOpsUser } from "../src/domain.js";
 import { StoredWorkItemResult, toStoredWorkItem } from "../src/storage.js";
 
@@ -90,6 +94,47 @@ describe("AdminMetricsService", () => {
       closedIssues: 1,
       issuesCreatedLast7Days: 2
     });
+  });
+
+  it("aggregates request metrics from Application Insights telemetry", async () => {
+    const service = new AdminMetricsService(
+      { getUser: async () => user({ isAdmin: true }), listUsers: async () => [] },
+      { listAllWorkItems: async () => [] },
+      {
+        getRequestMetrics: async () => ({
+          totalRequests: 42,
+          failedRequests: 3,
+          averageResponseTimeMs: 128.5
+        })
+      },
+      "workspace-id"
+    );
+
+    await expect(service.getRequestMetrics()).resolves.toEqual({
+      totalRequests: 42,
+      failedRequests: 3,
+      averageResponseTimeMs: 128.5
+    });
+  });
+
+  it("normalizes empty request telemetry to zero metrics", () => {
+    expect(requestMetricsFromLogsResult({ status: "Success", tables: [{ rows: [[0, 0, null]] }] })).toEqual({
+      totalRequests: 0,
+      failedRequests: 0,
+      averageResponseTimeMs: 0
+    });
+
+    expect(requestMetricsFromLogsResult({ status: "Success", tables: [] })).toEqual({
+      totalRequests: 0,
+      failedRequests: 0,
+      averageResponseTimeMs: 0
+    });
+  });
+
+  it("rejects partial request telemetry query results", () => {
+    expect(() => requestMetricsFromLogsResult({ status: "PartialFailure", tables: [] })).toThrow(
+      "Application Insights request metrics query failed"
+    );
   });
 
   it("rejects non-admin callers for admin metrics authorization", async () => {

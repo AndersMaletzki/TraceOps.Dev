@@ -179,6 +179,12 @@ export type IssueMetrics = {
   issuesCreatedLast7Days: number;
 };
 
+export type RequestMetrics = {
+  totalRequests: number;
+  failedRequests: number;
+  averageResponseTimeMs: number;
+};
+
 export type UpdateStatusInput = {
   tenantId: string;
   repoId: string;

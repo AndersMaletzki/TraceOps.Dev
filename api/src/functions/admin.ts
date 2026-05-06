@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { AdminMetricsService } from "../adminMetricsService.js";
+import { AdminMetricsService, AzureMonitorRequestTelemetryStore } from "../adminMetricsService.js";
 import { getConfig, TraceOpsConfig } from "../config.js";
 import { authenticate, errorResponse, json, parseCallerUserKey } from "../http.js";
 import { UserRepository, WorkItemRepository } from "../storage.js";
@@ -13,7 +13,9 @@ function getService(): { config: TraceOpsConfig; service: AdminMetricsService } 
     cachedConfig = getConfig();
     cachedService = new AdminMetricsService(
       new UserRepository(cachedConfig),
-      new WorkItemRepository(cachedConfig)
+      new WorkItemRepository(cachedConfig),
+      new AzureMonitorRequestTelemetryStore(),
+      cachedConfig.logAnalyticsWorkspaceId
     );
   }
 
@@ -57,6 +59,13 @@ export async function getIssueMetrics(
   return handle(request, async (service) => json(200, await service.getIssueMetrics()));
 }
 
+export async function getRequestMetrics(
+  request: HttpRequest,
+  _context: InvocationContext
+): Promise<HttpResponseInit> {
+  return handle(request, async (service) => json(200, await service.getRequestMetrics()));
+}
+
 app.http("getUserMetrics", {
   methods: ["GET"],
   authLevel: "anonymous",
@@ -69,4 +78,11 @@ app.http("getIssueMetrics", {
   authLevel: "anonymous",
   route: "app/admin/metrics/issues",
   handler: getIssueMetrics
+});
+
+app.http("getRequestMetrics", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "app/admin/metrics/requests",
+  handler: getRequestMetrics
 });

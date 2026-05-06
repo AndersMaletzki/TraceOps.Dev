@@ -22,12 +22,14 @@ describe("getConfig", () => {
       TRACEOPS_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true",
       TRACEOPS_TABLE_USERS: "UsersLocal",
       TRACEOPS_TABLE_TENANTS: "TenantsLocal",
-      TRACEOPS_TABLE_TENANT_MEMBERS: "TenantMembersLocal"
+      TRACEOPS_TABLE_TENANT_MEMBERS: "TenantMembersLocal",
+      TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID: " workspace-id "
     });
 
     expect(config.usersTableName).toBe("UsersLocal");
     expect(config.tenantsTableName).toBe("TenantsLocal");
     expect(config.tenantMembersTableName).toBe("TenantMembersLocal");
+    expect(config.logAnalyticsWorkspaceId).toBe("workspace-id");
   });
 
   it("rejects a raw API key value", () => {

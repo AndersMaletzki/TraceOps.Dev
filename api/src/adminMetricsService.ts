@@ -1,8 +1,23 @@
-import { IssueMetrics, TraceOpsUser, UserMetrics, WorkItem } from "./domain.js";
+import { DefaultAzureCredential } from "@azure/identity";
+import { LogsQueryClient, LogsQueryResultStatus } from "@azure/monitor-query-logs";
+import { IssueMetrics, RequestMetrics, TraceOpsUser, UserMetrics, WorkItem } from "./domain.js";
 import { isStorageNotFound, toWorkItem, UserRepository, WorkItemRepository } from "./storage.js";
 
 type UserStore = Pick<UserRepository, "getUser" | "listUsers">;
 type WorkItemStore = Pick<WorkItemRepository, "listAllWorkItems">;
+
+type LogsTable = {
+  rows: unknown[][];
+};
+
+type LogsQuerySuccess = {
+  status: string;
+  tables?: LogsTable[];
+};
+
+export type RequestTelemetryStore = {
+  getRequestMetrics(workspaceId: string): Promise<RequestMetrics>;
+};
 
 export class AdminAccessDeniedError extends Error {
   constructor() {
@@ -25,10 +40,59 @@ function providerIsMicrosoft(user: TraceOpsUser): boolean {
   return provider === "aad" || provider === "microsoft" || provider === "entra";
 }
 
+function finiteMetric(value: unknown): number {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function wholeMetric(value: unknown): number {
+  return Math.trunc(finiteMetric(value));
+}
+
+export class AzureMonitorRequestTelemetryStore implements RequestTelemetryStore {
+  private readonly client = new LogsQueryClient(new DefaultAzureCredential());
+
+  async getRequestMetrics(workspaceId: string): Promise<RequestMetrics> {
+    const result = await this.client.queryWorkspace(
+      workspaceId,
+      `
+AppRequests
+| summarize
+    totalRequests = sum(ItemCount),
+    failedRequests = sumif(ItemCount, Success == false),
+    averageResponseTimeMs = avg(DurationMs)
+`,
+      { duration: "P7D" }
+    );
+
+    if (result.status !== LogsQueryResultStatus.Success) {
+      throw new Error("Application Insights request metrics query failed");
+    }
+
+    return requestMetricsFromLogsResult(result);
+  }
+}
+
+export function requestMetricsFromLogsResult(result: LogsQuerySuccess): RequestMetrics {
+  if (result.status !== LogsQueryResultStatus.Success) {
+    throw new Error("Application Insights request metrics query failed");
+  }
+
+  const row = result.tables?.[0]?.rows[0] ?? [];
+
+  return {
+    totalRequests: wholeMetric(row[0]),
+    failedRequests: wholeMetric(row[1]),
+    averageResponseTimeMs: finiteMetric(row[2])
+  };
+}
+
 export class AdminMetricsService {
   constructor(
     private readonly users: UserStore,
-    private readonly workItems: WorkItemStore
+    private readonly workItems: WorkItemStore,
+    private readonly requestTelemetry?: RequestTelemetryStore,
+    private readonly logAnalyticsWorkspaceId?: string
   ) {}
 
   async assertAdminUser(userKey: string): Promise<void> {
@@ -76,6 +140,14 @@ export class AdminMetricsService {
       closedIssues: workItems.filter((workItem) => workItem.status === "Closed").length,
       issuesCreatedLast7Days: workItems.filter((workItem) => isAtOrAfter(workItem.createdAt, last7Days)).length
     };
+  }
+
+  async getRequestMetrics(): Promise<RequestMetrics> {
+    if (!this.requestTelemetry || !this.logAnalyticsWorkspaceId) {
+      throw new Error("TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID is required");
+    }
+
+    return this.requestTelemetry.getRequestMetrics(this.logAnalyticsWorkspaceId);
   }
 }
 
