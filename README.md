@@ -405,6 +405,8 @@ Deploy through GitHub Actions using OIDC. Required repository secrets:
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
 
+Do not add `TRACEOPS_API_KEY` or `TRACEOPS_API_KEY_HASH_SECRET` as GitHub repository secrets for production. The Function App reads those values from the workload Key Vault through app settings references.
+
 The workload Bicep creates:
 
 - app deployment app registration and service principal

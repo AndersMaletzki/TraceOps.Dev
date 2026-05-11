@@ -61,7 +61,7 @@ TraceOps.Dev v0.1 does not support:
 
 ## API
 
-All endpoints require `x-api-key`. `TRACEOPS_API_KEY` stores the lowercase SHA-256 hash of the API key, and clients send the raw API key as the bearer value. The API hashes the incoming key before comparing.
+Trusted internal endpoints use `x-api-key`. `TRACEOPS_API_KEY` stores the lowercase SHA-256 hash of the raw trusted key, and the API hashes the incoming `x-api-key` value before comparing. Tenant-scoped work item endpoints also accept `Authorization: Bearer <personal-api-key>` for personal API keys.
 
 ```text
 POST  /workitems
@@ -119,6 +119,7 @@ v0.1 stores product-owned data in Azure Table Storage tables:
 - `TraceOpsUsers`
 - `TraceOpsTenants`
 - `TraceOpsTenantMembers`
+- `TraceOpsApiKeys`
 
 Work item keys:
 
@@ -233,6 +234,8 @@ The app deployment identity receives only resource-group-scoped permissions on `
 - Website Contributor
 
 After infrastructure deployment, the `appDeployClientId` output must be stored as the repository secret `AZURE_CLIENT_ID`.
+
+`TRACEOPS_API_KEY` and `TRACEOPS_API_KEY_HASH_SECRET` are not GitHub repository secrets in production. The Function App reads them from Key Vault references created by the workload deployment.
 
 Pull requests:
 
