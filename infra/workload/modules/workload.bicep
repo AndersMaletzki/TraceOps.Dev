@@ -37,7 +37,6 @@ var appInsightsName = 'appi-traceops-${environmentName}-${suffix}'
 var keyVaultName = 'kv-traceops-${environmentName}-${suffix}'
 var deploymentStorageContainerName = 'func-traceops-${normalizedEnvironmentName}-${suffix}-packages'
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
-var keyVaultUri = 'https://${keyVaultName}.${environment().suffixes.keyvaultDns}'
 var websiteContributorRoleId = 'de139f84-1756-47ae-9be6-808fbbe84772'
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var logAnalyticsDataReaderRoleId = '3b03c2da-16b3-4a49-8834-0f8130efdd3b'
@@ -203,11 +202,11 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
         }
         {
           name: 'TRACEOPS_API_KEY'
-          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/TRACEOPS-API-KEY/)'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=TRACEOPS-API-KEY)'
         }
         {
           name: 'TRACEOPS_API_KEY_HASH_SECRET'
-          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/TRACEOPS-API-KEY-HASH-SECRET/)'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=TRACEOPS-API-KEY-HASH-SECRET)'
         }
         {
           name: 'TRACEOPS_STORAGE_CONNECTION_STRING'
