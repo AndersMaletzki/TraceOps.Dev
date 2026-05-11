@@ -85,7 +85,6 @@ jobs:
           --parameters
           resourceGroupName=rg-traceops-prod
           environmentName=prod
-          traceOpsApiKey='${{ secrets.TRACEOPS_API_KEY }}'
 
   approve-production:
     name: Approve production
@@ -159,7 +158,6 @@ jobs:
             --parameters \
             resourceGroupName=rg-traceops-prod \
             environmentName=prod \
-            traceOpsApiKey='${{ secrets.TRACEOPS_API_KEY }}' \
             appDeploymentPrincipalObjectId='${{ steps.identity_deploy.outputs.appDeployPrincipalObjectId }}'
 
           outputs="$(az deployment sub show --name traceops-workload --query properties.outputs -o json)"

@@ -9,14 +9,6 @@ param resourceGroupName string = 'rg-traceops-prod'
 @description('Deployment environment name.')
 param environmentName string = 'prod'
 
-@description('Lowercase SHA-256 hex API key hash used by the Function App. Store the hash in GitHub Secrets or Key Vault.')
-@secure()
-param traceOpsApiKey string
-
-@description('Secret used to HMAC personal API keys before storing them in Table Storage. Store this in GitHub Secrets or Key Vault.')
-@secure()
-param traceOpsApiKeyHashSecret string
-
 @description('Optional principal object ID for TraceOps app deployment identity.')
 param appDeploymentPrincipalObjectId string = ''
 
@@ -49,8 +41,6 @@ module workload 'modules/workload.bicep' = {
   params: {
     location: location
     environmentName: environmentName
-    traceOpsApiKey: traceOpsApiKey
-    traceOpsApiKeyHashSecret: traceOpsApiKeyHashSecret
     appDeploymentPrincipalObjectId: appDeploymentPrincipalObjectId
     workItemsTableName: workItemsTableName
     workItemEventsTableName: workItemEventsTableName
@@ -62,6 +52,7 @@ module workload 'modules/workload.bicep' = {
 }
 
 output functionAppName string = workload.outputs.functionAppName
+output keyVaultName string = workload.outputs.keyVaultName
 output resourceGroup string = resourceGroup.name
 output storageAccountName string = workload.outputs.storageAccountName
 output workItemsTable string = workload.outputs.workItemsTable

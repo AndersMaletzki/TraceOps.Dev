@@ -298,12 +298,13 @@ The current implementation wires scopes into the auth context and enforces them 
 
 ## Azure App Settings
 
-Add these app settings to the Function App deployment:
+The workload deployment sets:
 
-- `TRACEOPS_API_KEY_HASH_SECRET`
+- `TRACEOPS_API_KEY` as a Key Vault reference to secret `TRACEOPS-API-KEY`
+- `TRACEOPS_API_KEY_HASH_SECRET` as a Key Vault reference to secret `TRACEOPS-API-KEY-HASH-SECRET`
 - `TRACEOPS_TABLE_API_KEYS`
 
-The included Bicep changes create the `TraceOpsApiKeys` Azure Table and set both application settings alongside the existing work item, user, tenant, and tenant member settings.
+The included Bicep changes create the `TraceOpsApiKeys` Azure Table, create the workload Key Vault with RBAC enabled, and grant the Function App managed identity permission to read secrets from that vault.
 
 Users metrics response:
 
@@ -398,20 +399,42 @@ Deploy through GitHub Actions using OIDC. Required repository secrets:
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
-- `TRACEOPS_API_KEY` as a lowercase SHA-256 hash value for the API app
 
 The workload Bicep creates:
 
 - app deployment app registration and service principal
 - resource group
 - Azure Storage account
+- Azure Key Vault with RBAC authorization enabled
 - `WorkItems` table
 - `WorkItemEvents` table
 - `TraceOpsUsers` table
 - `TraceOpsTenants` table
 - `TraceOpsTenantMembers` table
+- `TraceOpsApiKeys` table
 - Linux Azure Function App on Node 20
 - Application Insights and Log Analytics
+
+After infrastructure deployment:
+
+1. Open the created Key Vault.
+2. Add secret `TRACEOPS-API-KEY` with the existing global API key lowercase SHA-256 hash value.
+3. Add secret `TRACEOPS-API-KEY-HASH-SECRET` with a strong random HMAC secret.
+4. Restart the Function App if the Key Vault references do not resolve automatically.
+
+Azure CLI examples:
+
+```bash
+az keyvault secret set \
+  --vault-name <vault-name> \
+  --name TRACEOPS-API-KEY \
+  --value "<existing-lowercase-sha256-api-key-hash>"
+
+az keyvault secret set \
+  --vault-name <vault-name> \
+  --name TRACEOPS-API-KEY-HASH-SECRET \
+  --value "<strong-random-secret>"
+```
 
 ## Data Model
 

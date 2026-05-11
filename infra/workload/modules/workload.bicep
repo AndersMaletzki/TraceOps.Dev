@@ -6,14 +6,6 @@ param location string = resourceGroup().location
 @description('Deployment environment name.')
 param environmentName string = 'prod'
 
-@description('Lowercase SHA-256 hex API key hash used by the Function App.')
-@secure()
-param traceOpsApiKey string
-
-@description('Secret used to HMAC personal API keys before storing them.')
-@secure()
-param traceOpsApiKeyHashSecret string
-
 @description('Optional principal object ID for TraceOps app deployment identity.')
 param appDeploymentPrincipalObjectId string = ''
 
@@ -42,9 +34,12 @@ var functionAppName = 'func-traceops-${environmentName}-${suffix}'
 var appServicePlanName = 'asp-traceops-${environmentName}-${suffix}'
 var logAnalyticsName = 'log-traceops-${environmentName}-${suffix}'
 var appInsightsName = 'appi-traceops-${environmentName}-${suffix}'
+var keyVaultName = 'kv-traceops-${environmentName}-${suffix}'
 var deploymentStorageContainerName = 'func-traceops-${normalizedEnvironmentName}-${suffix}-packages'
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+var keyVaultUri = 'https://${keyVaultName}.${environment().suffixes.keyvaultDns}'
 var websiteContributorRoleId = 'de139f84-1756-47ae-9be6-808fbbe84772'
+var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var logAnalyticsDataReaderRoleId = '3b03c2da-16b3-4a49-8834-0f8130efdd3b'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
@@ -131,6 +126,24 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   }
 }
 
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: keyVaultName
+  location: location
+  properties: {
+    enableRbacAuthorization: true
+    enabledForDeployment: false
+    enabledForDiskEncryption: false
+    enabledForTemplateDeployment: false
+    publicNetworkAccess: 'Enabled'
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    softDeleteRetentionInDays: 90
+    tenantId: subscription().tenantId
+  }
+}
+
 resource appServicePlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: appServicePlanName
   location: location
@@ -190,11 +203,11 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
         }
         {
           name: 'TRACEOPS_API_KEY'
-          value: traceOpsApiKey
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/TRACEOPS-API-KEY/)'
         }
         {
           name: 'TRACEOPS_API_KEY_HASH_SECRET'
-          value: traceOpsApiKeyHashSecret
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/TRACEOPS-API-KEY-HASH-SECRET/)'
         }
         {
           name: 'TRACEOPS_STORAGE_CONNECTION_STRING'
@@ -243,7 +256,18 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     tenantsTable
     tenantMembersTable
     apiKeysTable
+    keyVault
   ]
+}
+
+resource traceOpsFunctionKeyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, functionApp.id, keyVaultSecretsUserRoleId)
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
 }
 
 resource traceOpsFunctionLogAnalyticsDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -267,6 +291,7 @@ resource traceOpsDeploymentWebsiteContributor 'Microsoft.Authorization/roleAssig
 }
 
 output functionAppName string = functionApp.name
+output keyVaultName string = keyVault.name
 output storageAccountName string = storageAccount.name
 output workItemsTable string = workItemsTable.name
 output workItemEventsTable string = workItemEventsTable.name

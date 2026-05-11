@@ -11,6 +11,7 @@ TraceOps.Dev now deploys the API to Azure Functions Flex Consumption instead of 
 - A blob deployment container is created in the existing TraceOps storage account for Flex Consumption One Deploy packages.
 - `WEBSITE_RUN_FROM_PACKAGE` is no longer configured because Flex Consumption uses One Deploy.
 - The Function App keeps a system-assigned managed identity.
+- The workload Bicep creates a Key Vault with RBAC enabled and grants the Function App managed identity `Key Vault Secrets User` on that vault.
 - The app deployment service principal gets Website Contributor at the Function App scope for package deployment.
 - Existing TraceOps tables and the existing TraceOps storage account are preserved.
 
@@ -35,9 +36,13 @@ TraceOps.Dev now deploys the API to Azure Functions Flex Consumption instead of 
   - Hosting plan SKU `FC1` / `FlexConsumption`.
   - Runtime `node` version `20` under Flex application configuration.
   - Instance memory `512` MB under scale and concurrency.
-  - App settings for `TRACEOPS_API_KEY` as a lowercase SHA-256 hash value, `TRACEOPS_STORAGE_CONNECTION_STRING`, `TRACEOPS_TABLE_WORKITEMS`, `TRACEOPS_TABLE_WORKITEM_EVENTS`, and `APPLICATIONINSIGHTS_CONNECTION_STRING`.
+  - App settings for `TRACEOPS_API_KEY` and `TRACEOPS_API_KEY_HASH_SECRET` as Key Vault references, plus `TRACEOPS_STORAGE_CONNECTION_STRING`, `TRACEOPS_TABLE_WORKITEMS`, `TRACEOPS_TABLE_WORKITEM_EVENTS`, and `APPLICATIONINSIGHTS_CONNECTION_STRING`.
   - No `WEBSITE_RUN_FROM_PACKAGE`, `FUNCTIONS_WORKER_RUNTIME`, or `FUNCTIONS_EXTENSION_VERSION` app settings.
 - Exercise the existing API routes and confirm records are read from and written to the existing TraceOps tables.
+- After infrastructure deployment, add the required Key Vault secrets manually before expecting API auth to work:
+  - `TRACEOPS-API-KEY` with the existing lowercase SHA-256 global API key hash.
+  - `TRACEOPS-API-KEY-HASH-SECRET` with a strong random HMAC secret.
+  - Restart the Function App if Key Vault references do not resolve automatically after the secrets are created.
 
 ## Manual cleanup
 
