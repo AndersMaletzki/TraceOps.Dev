@@ -24,6 +24,7 @@ export class TraceOpsApiError extends Error {
 
 export class TraceOpsApiClient {
   private readonly baseUrl: URL;
+  private readonly authHeaders: Record<string, string>;
 
   constructor(
     apiBaseUrl: string,
@@ -31,6 +32,7 @@ export class TraceOpsApiClient {
     private readonly fetchFn: FetchFunction = fetch
   ) {
     this.baseUrl = new URL(apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`);
+    this.authHeaders = this.buildAuthHeaders(apiKey);
   }
 
   async createWorkItem(input: unknown): Promise<WorkItem> {
@@ -137,7 +139,7 @@ export class TraceOpsApiClient {
       method: options.method,
       headers: {
         "content-type": "application/json",
-        "x-api-key": this.apiKey
+        ...this.authHeaders
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body)
     });
@@ -154,5 +156,17 @@ export class TraceOpsApiClient {
     }
 
     return parsedBody as T;
+  }
+
+  private buildAuthHeaders(apiKey: string): Record<string, string> {
+    if (apiKey.startsWith("trc_")) {
+      return {
+        authorization: `Bearer ${apiKey}`
+      };
+    }
+
+    return {
+      "x-api-key": apiKey
+    };
   }
 }

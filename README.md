@@ -74,6 +74,11 @@ export TRACEOPS_API_BASE_URL='http://localhost:7071/api'
 export TRACEOPS_API_KEY='local-dev-key'
 ```
 
+`TRACEOPS_API_KEY` in the MCP server accepts either:
+
+- the raw trusted internal API key, which the MCP sends as `x-api-key`
+- a personal API key like `trc_live_...`, which the MCP sends as `Authorization: Bearer ...`
+
 For the API, `TRACEOPS_API_KEY` is the lowercase SHA-256 hash of the raw trusted internal API key. HTTP clients such as the website backend and MCP server authenticate by sending the raw key in `x-api-key`; the API hashes that incoming value before comparing. The local API hash above is the SHA-256 hash of `local-dev-key`.
 
 `TRACEOPS_API_KEY_HASH_SECRET` is separate. It is a high-entropy secret used only for HMAC-SHA256 hashing of personal API keys before they are stored in Table Storage. Personal API keys are never stored in raw form.

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TraceOpsApiClient } from "../src/apiClient.js";
 
 const testRawApiKey = "local-dev-key";
+const testPersonalApiKey = "trc_live_abc123def456_secret";
 
 describe("TraceOpsApiClient", () => {
   it("shapes search requests with tenant, repo, filters, limit, and API key", async () => {
@@ -78,5 +79,38 @@ describe("TraceOpsApiClient", () => {
       repoId: "repo",
       externalBranchName: "codex/test"
     });
+  });
+
+  it("uses bearer auth for personal API keys", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ items: [], count: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+
+    const client = new TraceOpsApiClient(
+      "http://localhost:7071/api",
+      testPersonalApiKey,
+      fetchMock as unknown as typeof fetch
+    );
+
+    await client.searchWorkItems({
+      tenantId: "tenant",
+      repoId: "repo",
+      limit: 10
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      URL | RequestInfo,
+      RequestInit | undefined
+    ];
+    expect(init).toMatchObject({
+      method: "GET",
+      headers: expect.objectContaining({
+        authorization: `Bearer ${testPersonalApiKey}`
+      })
+    });
+    expect((init?.headers as Record<string, string>)["x-api-key"]).toBeUndefined();
   });
 });
