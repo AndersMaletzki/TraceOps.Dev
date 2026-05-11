@@ -7,28 +7,34 @@ describe("getConfig", () => {
   it("accepts and normalizes a SHA-256 API key hash", () => {
     const config = getConfig({
       TRACEOPS_API_KEY: apiKeyHash.toUpperCase(),
+      TRACEOPS_API_KEY_HASH_SECRET: "super-secret",
       TRACEOPS_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true"
     });
 
     expect(config.apiKey).toBe(apiKeyHash);
+    expect(config.apiKeyHashSecret).toBe("super-secret");
     expect(config.usersTableName).toBe("TraceOpsUsers");
     expect(config.tenantsTableName).toBe("TraceOpsTenants");
     expect(config.tenantMembersTableName).toBe("TraceOpsTenantMembers");
+    expect(config.apiKeysTableName).toBe("TraceOpsApiKeys");
   });
 
   it("accepts identity table name overrides", () => {
     const config = getConfig({
       TRACEOPS_API_KEY: apiKeyHash,
+      TRACEOPS_API_KEY_HASH_SECRET: "super-secret",
       TRACEOPS_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true",
       TRACEOPS_TABLE_USERS: "UsersLocal",
       TRACEOPS_TABLE_TENANTS: "TenantsLocal",
       TRACEOPS_TABLE_TENANT_MEMBERS: "TenantMembersLocal",
+      TRACEOPS_TABLE_API_KEYS: "ApiKeysLocal",
       TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID: " workspace-id "
     });
 
     expect(config.usersTableName).toBe("UsersLocal");
     expect(config.tenantsTableName).toBe("TenantsLocal");
     expect(config.tenantMembersTableName).toBe("TenantMembersLocal");
+    expect(config.apiKeysTableName).toBe("ApiKeysLocal");
     expect(config.logAnalyticsWorkspaceId).toBe("workspace-id");
   });
 
@@ -36,8 +42,18 @@ describe("getConfig", () => {
     expect(() =>
       getConfig({
         TRACEOPS_API_KEY: "local-dev-key",
+        TRACEOPS_API_KEY_HASH_SECRET: "super-secret",
         TRACEOPS_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true"
       })
     ).toThrow("TRACEOPS_API_KEY must be a lowercase SHA-256 hex value");
+  });
+
+  it("requires the personal API key hash secret", () => {
+    expect(() =>
+      getConfig({
+        TRACEOPS_API_KEY: apiKeyHash,
+        TRACEOPS_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true"
+      })
+    ).toThrow("TRACEOPS_API_KEY_HASH_SECRET is required");
   });
 });

@@ -1,7 +1,7 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { AuthService } from "../authService.js";
 import { getConfig, TraceOpsConfig } from "../config.js";
-import { authenticate, errorResponse, json, readJson } from "../http.js";
+import { authenticateTrustedRequest, errorResponse, json, readJson } from "../http.js";
 import { TenantMemberRepository, TenantRepository, UserRepository } from "../storage.js";
 import { parseSyncUserInput } from "../validation.js";
 
@@ -30,7 +30,7 @@ async function handle(
 ): Promise<HttpResponseInit> {
   try {
     const { config, service } = getService();
-    const authResponse = authenticate(request, config);
+    const authResponse = authenticateTrustedRequest(request, config);
 
     if (authResponse) {
       return authResponse;

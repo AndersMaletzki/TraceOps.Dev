@@ -34,6 +34,9 @@ export type TenantType = (typeof tenantTypes)[number];
 export const tenantMemberRoles = ["owner", "admin", "member", "viewer"] as const;
 export type TenantMemberRole = (typeof tenantMemberRoles)[number];
 
+export const apiKeyScopes = ["workitems:read", "workitems:create", "workitems:update"] as const;
+export type ApiKeyScope = (typeof apiKeyScopes)[number];
+
 export type TraceOpsUser = {
   userKey: string;
   identityProvider: string;
@@ -60,6 +63,52 @@ export type TraceOpsTenantMember = {
   role: TenantMemberRole;
   createdAtUtc: string;
 };
+
+export type TraceOpsApiKey = {
+  apiKeyId: string;
+  tenantId: string;
+  userKey: string;
+  name: string;
+  keyPrefix: string;
+  keyHash: string;
+  scopes: ApiKeyScope[];
+  createdAtUtc: string;
+  expiresAtUtc: string;
+  lastUsedAtUtc: string;
+  revokedAtUtc: string;
+};
+
+export type ApiKeyMetadata = Omit<TraceOpsApiKey, "keyHash">;
+
+export type CreateApiKeyInput = {
+  tenantId: string;
+  userKey: string;
+  name: string;
+  scopes: ApiKeyScope[];
+  expiresAtUtc?: string;
+};
+
+export type CreateApiKeyResult = {
+  apiKey: string;
+  metadata: ApiKeyMetadata;
+};
+
+export type PersonalApiKeyAuthContext = {
+  kind: "personal";
+  apiKeyId: string;
+  tenantId: string;
+  userKey: string;
+  scopes: ApiKeyScope[];
+};
+
+export type GlobalApiKeyAuthContext = {
+  kind: "global";
+  userKey?: string;
+  tenantId?: string;
+  scopes: ApiKeyScope[];
+};
+
+export type AuthContext = PersonalApiKeyAuthContext | GlobalApiKeyAuthContext;
 
 export type SyncUserInput = {
   identityProvider: string;

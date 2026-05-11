@@ -10,6 +10,10 @@ param environmentName string = 'prod'
 @secure()
 param traceOpsApiKey string
 
+@description('Secret used to HMAC personal API keys before storing them.')
+@secure()
+param traceOpsApiKeyHashSecret string
+
 @description('Optional principal object ID for TraceOps app deployment identity.')
 param appDeploymentPrincipalObjectId string = ''
 
@@ -27,6 +31,9 @@ param tenantsTableName string = 'TraceOpsTenants'
 
 @description('Tenant members table name.')
 param tenantMembersTableName string = 'TraceOpsTenantMembers'
+
+@description('API keys table name.')
+param apiKeysTableName string = 'TraceOpsApiKeys'
 
 var suffix = take(uniqueString(subscription().id, resourceGroup().id, environmentName), 6)
 var normalizedEnvironmentName = toLower(replace(environmentName, '-', ''))
@@ -95,6 +102,11 @@ resource tenantsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@20
 
 resource tenantMembersTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
   name: tenantMembersTableName
+  parent: tableService
+}
+
+resource apiKeysTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  name: apiKeysTableName
   parent: tableService
 }
 
@@ -181,6 +193,10 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
           value: traceOpsApiKey
         }
         {
+          name: 'TRACEOPS_API_KEY_HASH_SECRET'
+          value: traceOpsApiKeyHashSecret
+        }
+        {
           name: 'TRACEOPS_STORAGE_CONNECTION_STRING'
           value: storageConnectionString
         }
@@ -205,6 +221,10 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
           value: tenantMembersTableName
         }
         {
+          name: 'TRACEOPS_TABLE_API_KEYS'
+          value: apiKeysTableName
+        }
+        {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsights.properties.ConnectionString
         }
@@ -222,6 +242,7 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     usersTable
     tenantsTable
     tenantMembersTable
+    apiKeysTable
   ]
 }
 
@@ -252,3 +273,4 @@ output workItemEventsTable string = workItemEventsTable.name
 output usersTable string = usersTable.name
 output tenantsTable string = tenantsTable.name
 output tenantMembersTable string = tenantMembersTable.name
+output apiKeysTable string = apiKeysTable.name

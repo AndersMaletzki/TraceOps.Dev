@@ -1,6 +1,4 @@
-# AGENTS.md
-
-This file contains project-specific instructions for Codex and other AI coding agents.
+# AGENTS.md — Project Setup Checklist
 
 ---
 
@@ -24,6 +22,9 @@ TraceOps.Dev is **not**:
 - An autonomous coding system
 
 ---
+## Architecture
+
+- If present read docs/architecture.md
 
 ## Repository Rules
 
@@ -31,61 +32,86 @@ TraceOps.Dev is **not**:
 - Application code and infrastructure live in the same repository.
 - Azure infrastructure must be written in Bicep.
 - GitHub Actions is used for CI/CD.
-- Pull requests validate and preview changes.
-- Main branch deploys production changes.
-- Do not commit secrets.
-- Do not use publish profiles.
 - Prefer GitHub OIDC and managed identities.
+- No manual Azure portal configuration unless explicitly documented.
+
 
 ---
 
 ## Folder Structure
 
 ```text
-.github/workflows/         CI/CD workflow definitions
-infra/github-identities/   Azure identities and OIDC-related infrastructure
-infra/workload/            Workload-specific Azure infrastructure (Bicep)
-docs/                      Architecture and operational documentation
+src/      Application code
+tests/    Automated tests
+infra/    Azure Bicep infrastructure
+docs/     Architecture and operational documentation
+scripts/  Local helper scripts
 ```
 
 ---
 
 ## Infrastructure Rules
 
-- Use `infra/github-identities/` for GitHub OIDC identities.
+
+- Use `infra/github-identities/` for repository-owned GitHub OIDC identities.
 - Use `infra/workload/` for workload-specific Azure resources.
-- Use Bicep modules under `infra/workload/modules/` when the project grows.
+- Use Bicep modules under `infra/workload/modules/`.
 - Keep parameters in parameter files.
-- Infrastructure should support PR what-if and main deployment.
-- Avoid manual Azure Portal configuration unless documented.
+- Infrastructure deployments must support PR what-if validation, main branch deployment, and production approval gates.
+- Infrastructure templates use `targetScope = 'subscription'`.
 
 ---
 
 ## GitHub Actions Rules
 
-Expected workflow files:
-
 ```text
 .github/workflows/deploy-main.yml
 .github/workflows/infrastructure.yml
-.github/workflows/deploy-app.yml
+.github/workflows/deploy-<workload>.yml
 ```
-
-Expected behavior:
 
 - `deploy-main.yml` orchestrates deployments.
 - `infrastructure.yml` validates and deploys Azure infrastructure.
-- `deploy-app.yml` builds, tests, packages, and deploys the application.
+- `deploy-<workload>.yml` builds, tests, packages, and deploys the application.
 - Infrastructure deploys before application code.
 
 ---
 
+## Azure OIDC Identity Model
+
+Two GitHub OIDC identities are always required:
+
+- `infrastructure.yml` must use `AZURE_INFRA_CLIENT_ID`.
+- `deploy-<workload>.yml` must use `AZURE_CLIENT_ID`.
+- Do not collapse these identities into one.
+
+| Secret | Source | Purpose |
+|---|---|---|
+| `AZURE_INFRA_CLIENT_ID` | `azure-bicep-configs` bootstrap | Infrastructure deployment only |
+| `AZURE_CLIENT_ID` | This repo's infra deployment | Application deployment only |
+
+## Azure Standards
+
+Default regions:
+
+- Primary: `westeurope`
+- SQL: `northeurope`
+
+Resource naming:
+
+| Resource | Pattern |
+|---|---|
+| Resource Group | `rg-<app>-<env>` |
+| Function App | `func-<app>-<env>-<suffix>` |
+| Storage Account | `st<app><env><suffix>` |
+| Key Vault | `kv-<app>-<env>-<suffix>` |
+
+Do not deviate from this naming convention without documenting the reason.---
+
 ## Security Rules
 
 - Use GitHub OIDC for Azure authentication.
-- Use separate app registrations for infrastructure deployment and app deployment.
-- `AZURE_INFRA_CLIENT_ID` comes from `azure-bicep-configs` and is used only by infrastructure workflows.
-- `AZURE_CLIENT_ID` comes from this repository's infrastructure deployment and is used only by app deployment workflows.
+- Use separate identities for infrastructure deployment and app deployment.
 - Prefer managed identities for Azure resource access.
 - Store secrets in GitHub Secrets or Azure Key Vault.
 - Never hardcode secrets, API keys, or connection strings.
@@ -102,19 +128,14 @@ Expected behavior:
 
 ---
 
-## TraceOps MCP Context
+## TraceOps Context
 
-- Omit `tenantId` in MCP tool calls when `TRACEOPS_DEFAULT_TENANT_ID` is configured.
-- Use `get_context` when tenant context is unclear.
-- Never invent `tenantId` values.
-- `repoId` is repository-specific and must not be globally configured.
+- repoId: `AndersMaletzki/TraceOps.Dev`
 
 ---
 
 ## What Codex Should Avoid
 
-- Do not introduce Terraform.
 - Do not use Azure publish profiles.
-- Do not create Azure resources outside Bicep.
 - Do not bypass tests or validation.
 - Do not change deployment architecture without explaining why.

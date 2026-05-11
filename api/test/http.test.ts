@@ -1,15 +1,21 @@
 import { HttpRequest } from "@azure/functions";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { ApiKeyAuthenticationError } from "../src/apiKeyService.js";
 import { TenantAccessDeniedError } from "../src/authService.js";
 import { TraceOpsConfig } from "../src/config.js";
-import { authenticate, errorResponse, parseAppWorkItemFiltersFromQuery, parseCallerUserKey } from "../src/http.js";
+import {
+  authenticate,
+  authenticateTrustedRequest,
+  errorResponse,
+  parseAppWorkItemFiltersFromQuery,
+  parseCallerUserKey
+} from "../src/http.js";
 
 const localDevKeyHash = "ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c";
-const otherHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-function requestWithApiKey(apiKey?: string): HttpRequest {
+function requestWithHeaders(headers: Record<string, string> = {}): HttpRequest {
   return {
-    headers: new Headers(apiKey === undefined ? {} : { "x-api-key": apiKey })
+    headers: new Headers(headers)
   } as unknown as HttpRequest;
 }
 
@@ -23,42 +29,108 @@ function requestWithQueryAndHeaders(query: Record<string, string>, headers: Reco
 function configWithApiKey(apiKey: string): TraceOpsConfig {
   return {
     apiKey,
+    apiKeyHashSecret: "super-secret",
     storageConnectionString: "UseDevelopmentStorage=true",
     workItemsTableName: "WorkItems",
     workItemEventsTableName: "WorkItemEvents",
     usersTableName: "TraceOpsUsers",
     tenantsTableName: "TraceOpsTenants",
-    tenantMembersTableName: "TraceOpsTenantMembers"
+    tenantMembersTableName: "TraceOpsTenantMembers",
+    apiKeysTableName: "TraceOpsApiKeys"
   };
 }
 
-describe("authenticate", () => {
+describe("authenticateTrustedRequest", () => {
   it("accepts a matching raw API key value", () => {
-    const response = authenticate(requestWithApiKey("local-dev-key"), configWithApiKey(localDevKeyHash));
+    const response = authenticateTrustedRequest(
+      requestWithHeaders({ "x-api-key": "local-dev-key" }),
+      configWithApiKey(localDevKeyHash)
+    );
 
     expect(response).toBeUndefined();
   });
 
   it("rejects the stored SHA-256 API key value as a request key", () => {
-    const response = authenticate(requestWithApiKey(localDevKeyHash), configWithApiKey(localDevKeyHash));
+    const response = authenticateTrustedRequest(
+      requestWithHeaders({ "x-api-key": localDevKeyHash }),
+      configWithApiKey(localDevKeyHash)
+    );
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });
 
   it("rejects a missing API key", () => {
-    const response = authenticate(requestWithApiKey(), configWithApiKey(localDevKeyHash));
+    const response = authenticateTrustedRequest(requestWithHeaders(), configWithApiKey(localDevKeyHash));
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });
 
   it("rejects an incorrect SHA-256 API key value", () => {
-    const response = authenticate(requestWithApiKey("wrong-key"), configWithApiKey(localDevKeyHash));
+    const response = authenticateTrustedRequest(
+      requestWithHeaders({ "x-api-key": "wrong-key" }),
+      configWithApiKey(localDevKeyHash)
+    );
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });
+});
 
-  it("rejects when the configured API key is not a SHA-256 hash", () => {
-    const response = authenticate(requestWithApiKey("local-dev-key"), configWithApiKey("not-a-sha-256-value"));
+describe("authenticate", () => {
+  it("returns global auth context for a valid trusted API key", async () => {
+    const auth = await authenticate(
+      requestWithHeaders({
+        "x-api-key": "local-dev-key",
+        "x-traceops-user-key": "github|123456",
+        "x-traceops-tenant-id": "tenant-123"
+      }),
+      configWithApiKey(localDevKeyHash)
+    );
+
+    expect(auth).toMatchObject({
+      kind: "global",
+      userKey: "github|123456",
+      tenantId: "tenant-123",
+      scopes: ["workitems:read", "workitems:create", "workitems:update"]
+    });
+  });
+
+  it("returns personal auth context for a valid bearer API key", async () => {
+    const apiKeyService = {
+      authenticatePersonalApiKey: vi.fn().mockResolvedValue({
+        kind: "personal",
+        apiKeyId: "key_123",
+        tenantId: "tenant-123",
+        userKey: "github|123456",
+        scopes: ["workitems:read"]
+      })
+    } as const;
+
+    const auth = await authenticate(
+      requestWithHeaders({ authorization: "Bearer trc_live_abc123def456_secret" }),
+      configWithApiKey(localDevKeyHash),
+      apiKeyService as never
+    );
+
+    expect(apiKeyService.authenticatePersonalApiKey).toHaveBeenCalledWith("trc_live_abc123def456_secret");
+    expect(auth).toMatchObject({
+      kind: "personal",
+      apiKeyId: "key_123",
+      tenantId: "tenant-123",
+      userKey: "github|123456",
+      scopes: ["workitems:read"]
+    });
+  });
+
+  it("returns 401 when bearer authentication fails", async () => {
+    const apiKeyService = {
+      authenticatePersonalApiKey: vi.fn().mockRejectedValue(new ApiKeyAuthenticationError())
+    } as const;
+
+    const response = await authenticate(
+      requestWithHeaders({ authorization: "Bearer trc_live_abc123def456_secret" }),
+      configWithApiKey(localDevKeyHash),
+      apiKeyService as never
+    );
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });

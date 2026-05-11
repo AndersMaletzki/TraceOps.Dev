@@ -13,6 +13,10 @@ param environmentName string = 'prod'
 @secure()
 param traceOpsApiKey string
 
+@description('Secret used to HMAC personal API keys before storing them in Table Storage. Store this in GitHub Secrets or Key Vault.')
+@secure()
+param traceOpsApiKeyHashSecret string
+
 @description('Optional principal object ID for TraceOps app deployment identity.')
 param appDeploymentPrincipalObjectId string = ''
 
@@ -31,6 +35,9 @@ param tenantsTableName string = 'TraceOpsTenants'
 @description('Tenant members table name.')
 param tenantMembersTableName string = 'TraceOpsTenantMembers'
 
+@description('API keys table name.')
+param apiKeysTableName string = 'TraceOpsApiKeys'
+
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
@@ -43,12 +50,14 @@ module workload 'modules/workload.bicep' = {
     location: location
     environmentName: environmentName
     traceOpsApiKey: traceOpsApiKey
+    traceOpsApiKeyHashSecret: traceOpsApiKeyHashSecret
     appDeploymentPrincipalObjectId: appDeploymentPrincipalObjectId
     workItemsTableName: workItemsTableName
     workItemEventsTableName: workItemEventsTableName
     usersTableName: usersTableName
     tenantsTableName: tenantsTableName
     tenantMembersTableName: tenantMembersTableName
+    apiKeysTableName: apiKeysTableName
   }
 }
 
@@ -60,3 +69,4 @@ output workItemEventsTable string = workload.outputs.workItemEventsTable
 output usersTable string = workload.outputs.usersTable
 output tenantsTable string = workload.outputs.tenantsTable
 output tenantMembersTable string = workload.outputs.tenantMembersTable
+output apiKeysTable string = workload.outputs.apiKeysTable

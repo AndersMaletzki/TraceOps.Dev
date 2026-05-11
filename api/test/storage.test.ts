@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { partitionKey } from "../src/domain.js";
 import {
+  apiKeyPartitionKey,
+  apiKeyRowKey,
+  toApiKey,
+  toApiKeyMetadata,
+  toStoredApiKey,
   tenantMemberPartitionKey,
   tenantMemberRowKey,
   toStoredTenant,
@@ -147,5 +152,42 @@ describe("storage mapping", () => {
     expect(stored.partitionKey).toBe("TENANT~tenant-123");
     expect(stored.rowKey).toBe("USER~github|123456");
     expect(toTenantMember(stored)).toEqual(member);
+  });
+
+  it("maps personal API keys to the API key table shape without exposing hashes in metadata", () => {
+    const apiKey = {
+      apiKeyId: "key_123",
+      tenantId: "tenant-123",
+      userKey: "github|123456",
+      name: "Codex CLI",
+      keyPrefix: "abc123def456",
+      keyHash: "a".repeat(64),
+      scopes: ["workitems:read", "workitems:update"] as const,
+      createdAtUtc: "2026-05-05T12:00:00.000Z",
+      expiresAtUtc: "",
+      lastUsedAtUtc: "",
+      revokedAtUtc: ""
+    };
+
+    const stored = toStoredApiKey(apiKey);
+
+    expect(apiKeyPartitionKey("tenant-123", "github|123456")).toBe("TENANT~tenant-123~USER~github|123456");
+    expect(apiKeyRowKey("key_123")).toBe("APIKEY~key_123");
+    expect(stored.partitionKey).toBe("TENANT~tenant-123~USER~github|123456");
+    expect(stored.rowKey).toBe("APIKEY~key_123");
+    expect(stored.scopes).toBe("[\"workitems:read\",\"workitems:update\"]");
+    expect(toApiKey(stored)).toEqual(apiKey);
+    expect(toApiKeyMetadata(apiKey)).toEqual({
+      apiKeyId: "key_123",
+      tenantId: "tenant-123",
+      userKey: "github|123456",
+      name: "Codex CLI",
+      keyPrefix: "abc123def456",
+      scopes: ["workitems:read", "workitems:update"],
+      createdAtUtc: "2026-05-05T12:00:00.000Z",
+      expiresAtUtc: "",
+      lastUsedAtUtc: "",
+      revokedAtUtc: ""
+    });
   });
 });

@@ -1,8 +1,11 @@
 import { odata, TableClient } from "@azure/data-tables";
 import { TraceOpsConfig } from "./config.js";
 import {
+  apiKeyScopes,
+  ApiKeyMetadata,
   CreateWorkItemInput,
   partitionKey,
+  TraceOpsApiKey,
   TraceOpsTenant,
   TraceOpsTenantMember,
   TraceOpsUser,
@@ -38,6 +41,12 @@ type StoredTraceOpsTenantMember = TraceOpsTenantMember & {
   rowKey: string;
 };
 
+type StoredTraceOpsApiKey = Omit<TraceOpsApiKey, "scopes"> & {
+  partitionKey: string;
+  rowKey: string;
+  scopes: string;
+};
+
 type StoredTraceOpsUserResult = Partial<StoredTraceOpsUser> &
   Pick<
     StoredTraceOpsUser,
@@ -68,6 +77,26 @@ type StoredTraceOpsTenantMemberResult = Partial<StoredTraceOpsTenantMember> &
   Pick<StoredTraceOpsTenantMember, "partitionKey" | "rowKey" | "tenantId" | "userKey" | "role" | "createdAtUtc"> & {
   etag?: string;
 };
+
+type StoredTraceOpsApiKeyResult = Partial<StoredTraceOpsApiKey> &
+  Pick<
+    StoredTraceOpsApiKey,
+    | "partitionKey"
+    | "rowKey"
+    | "apiKeyId"
+    | "tenantId"
+    | "userKey"
+    | "name"
+    | "keyPrefix"
+    | "keyHash"
+    | "scopes"
+    | "createdAtUtc"
+    | "expiresAtUtc"
+    | "lastUsedAtUtc"
+    | "revokedAtUtc"
+  > & {
+    etag?: string;
+  };
 
 export type StoredWorkItemResult = Partial<StoredWorkItem> &
   Pick<
@@ -239,6 +268,50 @@ export function toTenantMember(entity: StoredTraceOpsTenantMemberResult): TraceO
   };
 }
 
+function parseApiKeyScopes(value: string | undefined) {
+  return safeParseStringArray(value).filter((scope): scope is (typeof apiKeyScopes)[number] =>
+    apiKeyScopes.includes(scope as (typeof apiKeyScopes)[number])
+  );
+}
+
+export function apiKeyPartitionKey(tenantId: string, userKey: string): string {
+  return `TENANT~${tenantId}~USER~${userKey}`;
+}
+
+export function apiKeyRowKey(apiKeyId: string): string {
+  return `APIKEY~${apiKeyId}`;
+}
+
+export function toStoredApiKey(apiKey: TraceOpsApiKey): StoredTraceOpsApiKey {
+  return {
+    partitionKey: apiKeyPartitionKey(apiKey.tenantId, apiKey.userKey),
+    rowKey: apiKeyRowKey(apiKey.apiKeyId),
+    ...apiKey,
+    scopes: JSON.stringify(apiKey.scopes)
+  };
+}
+
+export function toApiKey(entity: StoredTraceOpsApiKeyResult): TraceOpsApiKey {
+  return {
+    apiKeyId: entity.apiKeyId,
+    tenantId: entity.tenantId,
+    userKey: entity.userKey,
+    name: entity.name,
+    keyPrefix: entity.keyPrefix,
+    keyHash: entity.keyHash,
+    scopes: parseApiKeyScopes(entity.scopes),
+    createdAtUtc: entity.createdAtUtc,
+    expiresAtUtc: entity.expiresAtUtc || "",
+    lastUsedAtUtc: entity.lastUsedAtUtc || "",
+    revokedAtUtc: entity.revokedAtUtc || ""
+  };
+}
+
+export function toApiKeyMetadata(apiKey: TraceOpsApiKey): ApiKeyMetadata {
+  const { keyHash: _keyHash, ...metadata } = apiKey;
+  return metadata;
+}
+
 function isNotFound(error: unknown): boolean {
   return typeof error === "object" && error !== null && "statusCode" in error && error.statusCode === 404;
 }
@@ -266,6 +339,13 @@ export class WorkItemNotFoundError extends Error {
   constructor(workItemId: string) {
     super(`Work item not found: ${workItemId}`);
     this.name = "WorkItemNotFoundError";
+  }
+}
+
+export class ApiKeyNotFoundError extends Error {
+  constructor(apiKeyId: string) {
+    super(`API key not found: ${apiKeyId}`);
+    this.name = "ApiKeyNotFoundError";
   }
 }
 
@@ -512,6 +592,79 @@ export class TenantMemberRepository {
     }
 
     return members;
+  }
+}
+
+export class ApiKeyRepository {
+  private readonly apiKeysClient: TableClient;
+
+  constructor(config: TraceOpsConfig) {
+    this.apiKeysClient = TableClient.fromConnectionString(
+      config.storageConnectionString,
+      config.apiKeysTableName
+    );
+  }
+
+  async createApiKey(apiKey: TraceOpsApiKey): Promise<TraceOpsApiKey> {
+    const entity = toStoredApiKey(apiKey);
+    await this.apiKeysClient.createEntity(entity);
+    return toApiKey(entity);
+  }
+
+  async getApiKey(tenantId: string, userKey: string, apiKeyId: string): Promise<TraceOpsApiKey> {
+    try {
+      const entity = await this.apiKeysClient.getEntity<StoredTraceOpsApiKeyResult>(
+        apiKeyPartitionKey(tenantId, userKey),
+        apiKeyRowKey(apiKeyId)
+      );
+      return toApiKey(entity);
+    } catch (error) {
+      if (isNotFound(error)) {
+        throw new ApiKeyNotFoundError(apiKeyId);
+      }
+
+      throw error;
+    }
+  }
+
+  async listApiKeysForUser(tenantId: string, userKey: string, limit = 100): Promise<TraceOpsApiKey[]> {
+    const items: TraceOpsApiKey[] = [];
+    const filter = odata`PartitionKey eq ${apiKeyPartitionKey(tenantId, userKey)}`;
+
+    for await (const entity of this.apiKeysClient.listEntities<StoredTraceOpsApiKeyResult>({
+      queryOptions: { filter }
+    })) {
+      items.push(toApiKey(entity));
+
+      if (items.length >= limit) {
+        break;
+      }
+    }
+
+    return items.sort((left, right) => right.createdAtUtc.localeCompare(left.createdAtUtc));
+  }
+
+  async findApiKeysByPrefix(keyPrefix: string, limit = 20): Promise<TraceOpsApiKey[]> {
+    const items: TraceOpsApiKey[] = [];
+    const filter = odata`keyPrefix eq ${keyPrefix}`;
+
+    for await (const entity of this.apiKeysClient.listEntities<StoredTraceOpsApiKeyResult>({
+      queryOptions: { filter }
+    })) {
+      items.push(toApiKey(entity));
+
+      if (items.length >= limit) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
+  async upsertApiKey(apiKey: TraceOpsApiKey): Promise<TraceOpsApiKey> {
+    const entity = toStoredApiKey(apiKey);
+    await this.apiKeysClient.upsertEntity(entity, "Replace");
+    return toApiKey(entity);
   }
 }
 

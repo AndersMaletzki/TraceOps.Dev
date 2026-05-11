@@ -4,11 +4,13 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "TRACEOPS_API_KEY": "ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c",
+    "TRACEOPS_API_KEY_HASH_SECRET": "replace-with-local-secret",
     "TRACEOPS_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
     "TRACEOPS_TABLE_WORKITEMS": "WorkItems",
     "TRACEOPS_TABLE_WORKITEM_EVENTS": "WorkItemEvents",
     "TRACEOPS_TABLE_USERS": "TraceOpsUsers",
     "TRACEOPS_TABLE_TENANTS": "TraceOpsTenants",
-    "TRACEOPS_TABLE_TENANT_MEMBERS": "TraceOpsTenantMembers"
+    "TRACEOPS_TABLE_TENANT_MEMBERS": "TraceOpsTenantMembers",
+    "TRACEOPS_TABLE_API_KEYS": "TraceOpsApiKeys"
   }
 }

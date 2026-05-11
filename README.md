@@ -57,12 +57,14 @@ API:
 
 ```bash
 export TRACEOPS_API_KEY='ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c'
+export TRACEOPS_API_KEY_HASH_SECRET='replace-with-a-long-random-secret'
 export TRACEOPS_STORAGE_CONNECTION_STRING='UseDevelopmentStorage=true'
 export TRACEOPS_TABLE_WORKITEMS='WorkItems'
 export TRACEOPS_TABLE_WORKITEM_EVENTS='WorkItemEvents'
 export TRACEOPS_TABLE_USERS='TraceOpsUsers'
 export TRACEOPS_TABLE_TENANTS='TraceOpsTenants'
 export TRACEOPS_TABLE_TENANT_MEMBERS='TraceOpsTenantMembers'
+export TRACEOPS_TABLE_API_KEYS='TraceOpsApiKeys'
 ```
 
 MCP server:
@@ -72,7 +74,9 @@ export TRACEOPS_API_BASE_URL='http://localhost:7071/api'
 export TRACEOPS_API_KEY='local-dev-key'
 ```
 
-For the API, `TRACEOPS_API_KEY` is the lowercase SHA-256 hash of the raw API key. HTTP clients, including the MCP server, authenticate by sending the raw API key in `x-api-key`; the API hashes that incoming value before comparing. The local API hash above is the SHA-256 hash of `local-dev-key`.
+For the API, `TRACEOPS_API_KEY` is the lowercase SHA-256 hash of the raw trusted internal API key. HTTP clients such as the website backend and MCP server authenticate by sending the raw key in `x-api-key`; the API hashes that incoming value before comparing. The local API hash above is the SHA-256 hash of `local-dev-key`.
+
+`TRACEOPS_API_KEY_HASH_SECRET` is separate. It is a high-entropy secret used only for HMAC-SHA256 hashing of personal API keys before they are stored in Table Storage. Personal API keys are never stored in raw form.
 
 ## Local Setup
 
@@ -161,6 +165,54 @@ curl -sS -X POST 'http://localhost:7071/api/auth/sync-user' \
 
 `POST /api/auth/sync-user` is a trusted backend endpoint. It must be called by the website backend after deriving identity from Azure Static Web Apps auth headers, and it still requires TraceOps API authentication through `x-api-key`. Browser clients must not call it directly without API auth and must not be trusted to choose arbitrary `tenantId` values. The API builds `userKey` as `<identityProvider>|<providerUserId>` instead of using email as the primary identity, creates or updates the user login metadata, ensures `personal~<identityProvider>~<providerUserId>` exists, ensures an `owner` tenant membership exists, and returns `user`, `personalTenant`, and `memberships`.
 
+Create a personal API key for an authenticated website user:
+
+```bash
+curl -sS -X POST 'http://localhost:7071/api/me/api-keys' \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: local-dev-key' \
+  -H 'x-traceops-user-key: github|123456' \
+  -H 'x-traceops-tenant-id: personal~github~123456' \
+  --data '{
+    "name": "Codex CLI",
+    "scopes": ["workitems:read", "workitems:create", "workitems:update"]
+  }'
+```
+
+List personal API key metadata:
+
+```bash
+curl -sS 'http://localhost:7071/api/me/api-keys' \
+  -H 'x-api-key: local-dev-key' \
+  -H 'x-traceops-user-key: github|123456' \
+  -H 'x-traceops-tenant-id: personal~github~123456'
+```
+
+Revoke a personal API key:
+
+```bash
+curl -sS -X DELETE 'http://localhost:7071/api/me/api-keys/key_123' \
+  -H 'x-api-key: local-dev-key' \
+  -H 'x-traceops-user-key: github|123456' \
+  -H 'x-traceops-tenant-id: personal~github~123456'
+```
+
+The raw personal API key is returned only once at creation time. The stored entity contains only:
+
+- `apiKeyId`
+- `tenantId`
+- `userKey`
+- `name`
+- `keyPrefix`
+- `keyHash`
+- `scopes`
+- `createdAtUtc`
+- `expiresAtUtc`
+- `lastUsedAtUtc`
+- `revokedAtUtc`
+
+`keyHash` is HMAC-SHA256 over the full personal API key using `TRACEOPS_API_KEY_HASH_SECRET`. The personal API key format is `trc_live_<prefix>_<secret>`.
+
 ## Website Proxy Contract
 
 TraceOps.Dev-website is a thin server-side proxy for product data. It calls TraceOps.Dev API with `TRACEOPS_API_BASE_URL` and the raw `TRACEOPS_API_KEY`; browser code must never receive that key and must never read or write TraceOps product tables directly. The TraceOps.Dev API owns users, tenants, tenant memberships, work items, work item events, and tenant-scoped authorization decisions.
@@ -169,6 +221,7 @@ All website proxy calls require:
 
 - `x-api-key: <raw TraceOps API key>`
 - `x-traceops-user-key: <identityProvider>|<providerUserId>` for user-scoped app reads
+- `x-traceops-tenant-id: <tenantId>` for personal API key management
 
 `POST /api/auth/sync-user` accepts only trusted backend identity fields:
 
@@ -222,6 +275,35 @@ Admin metrics endpoints require `x-api-key`:
 - `GET /api/app/admin/metrics/requests`
 
 They also require `x-traceops-user-key` for a TraceOps user whose stored `isAdmin` flag is `true`.
+
+## Personal API Key Flow
+
+Trusted website and backend calls continue using `x-api-key` with the existing global `TRACEOPS_API_KEY` flow.
+
+Personal API key lifecycle:
+
+1. The trusted website backend calls `POST /api/me/api-keys` with `x-api-key`, `x-traceops-user-key`, and `x-traceops-tenant-id`.
+2. TraceOps.Dev generates a random `trc_live_<prefix>_<secret>` key, stores only its HMAC-SHA256 hash plus metadata in `TraceOpsApiKeys`, and returns the raw key once.
+3. External clients call normal tenant-scoped API endpoints with `Authorization: Bearer <personal-api-key>`.
+4. TraceOps.Dev resolves the personal key to `userKey`, `tenantId`, and `scopes`, updates `lastUsedAtUtc`, and still enforces tenant membership on work item reads and writes.
+5. Personal API keys cannot access another tenant. Revoked or expired keys return `401 Unauthorized`.
+
+Scope values currently supported:
+
+- `workitems:read`
+- `workitems:create`
+- `workitems:update`
+
+The current implementation wires scopes into the auth context and enforces them on the work item endpoints. Other endpoint families still require trusted internal `x-api-key` calls.
+
+## Azure App Settings
+
+Add these app settings to the Function App deployment:
+
+- `TRACEOPS_API_KEY_HASH_SECRET`
+- `TRACEOPS_TABLE_API_KEYS`
+
+The included Bicep changes create the `TraceOpsApiKeys` Azure Table and set both application settings alongside the existing work item, user, tenant, and tenant member settings.
 
 Users metrics response:
 

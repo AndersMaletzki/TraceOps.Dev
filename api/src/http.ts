@@ -1,8 +1,10 @@
 import { HttpRequest, HttpResponseInit } from "@azure/functions";
 import { AdminAccessDeniedError } from "./adminMetricsService.js";
 import { apiKeysMatch } from "./apiKey.js";
+import { ApiKeyAuthenticationError, ApiKeyScopeDeniedError, ApiKeyService } from "./apiKeyService.js";
 import { TenantAccessDeniedError } from "./authService.js";
 import { TraceOpsConfig } from "./config.js";
+import { apiKeyScopes, ApiKeyScope, AuthContext } from "./domain.js";
 import {
   parseCategory,
   parseLimit,
@@ -31,7 +33,10 @@ export function json(status: number, body: unknown): HttpResponseInit {
   };
 }
 
-export function authenticate(request: HttpRequest, config: TraceOpsConfig): HttpResponseInit | undefined {
+export function authenticateTrustedRequest(
+  request: HttpRequest,
+  config: TraceOpsConfig
+): HttpResponseInit | undefined {
   const suppliedApiKey = request.headers.get("x-api-key");
 
   if (!suppliedApiKey || !apiKeysMatch(suppliedApiKey, config.apiKey)) {
@@ -39,6 +44,50 @@ export function authenticate(request: HttpRequest, config: TraceOpsConfig): Http
   }
 
   return undefined;
+}
+
+function parseBearerToken(request: HttpRequest): string | undefined {
+  const authorizationHeader = request.headers.get("authorization")?.trim();
+
+  if (!authorizationHeader) {
+    return undefined;
+  }
+
+  const match = /^Bearer\s+(.+)$/i.exec(authorizationHeader);
+  return match?.[1]?.trim() || undefined;
+}
+
+export async function authenticate(
+  request: HttpRequest,
+  config: TraceOpsConfig,
+  apiKeyService?: ApiKeyService
+): Promise<AuthContext | HttpResponseInit> {
+  const suppliedApiKey = request.headers.get("x-api-key");
+
+  if (suppliedApiKey && apiKeysMatch(suppliedApiKey, config.apiKey)) {
+    return {
+      kind: "global",
+      userKey: parseCallerUserKey(request),
+      tenantId: parseTrustedTenantId(request),
+      scopes: [...apiKeyScopes]
+    };
+  }
+
+  const bearerToken = parseBearerToken(request);
+
+  if (bearerToken && apiKeyService) {
+    try {
+      return await apiKeyService.authenticatePersonalApiKey(bearerToken);
+    } catch (error) {
+      if (error instanceof ApiKeyAuthenticationError) {
+        return json(401, { error: "Unauthorized" });
+      }
+
+      throw error;
+    }
+  }
+
+  return json(401, { error: "Unauthorized" });
 }
 
 export async function readJson(request: HttpRequest): Promise<unknown> {
@@ -69,6 +118,29 @@ export function parseCallerUserKey(request: HttpRequest): string | undefined {
   const trimmed = value?.trim();
 
   return trimmed || undefined;
+}
+
+export function parseTrustedTenantId(request: HttpRequest): string | undefined {
+  const value = request.headers.get("x-traceops-tenant-id");
+  const trimmed = value?.trim();
+
+  return trimmed || undefined;
+}
+
+export function callerUserKeyFromAuth(request: HttpRequest, auth: AuthContext): string | undefined {
+  return auth.kind === "personal" ? auth.userKey : parseCallerUserKey(request);
+}
+
+export function assertAuthorizedTenant(auth: AuthContext, tenantId: string): void {
+  if (auth.kind === "personal" && auth.tenantId !== tenantId) {
+    throw new TenantAccessDeniedError(tenantId);
+  }
+}
+
+export function assertApiKeyScope(auth: AuthContext, requiredScope: ApiKeyScope): void {
+  if (auth.kind === "personal" && !auth.scopes.includes(requiredScope)) {
+    throw new ApiKeyScopeDeniedError(requiredScope);
+  }
 }
 
 export function parseAppWorkItemFiltersFromQuery(request: HttpRequest): AppWorkItemFilters {
@@ -165,6 +237,10 @@ export function errorResponse(error: unknown): HttpResponseInit {
   }
 
   if (error instanceof TenantAccessDeniedError) {
+    return json(403, { error: error.message });
+  }
+
+  if (error instanceof ApiKeyScopeDeniedError) {
     return json(403, { error: error.message });
   }
 

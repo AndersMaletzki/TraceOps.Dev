@@ -13,6 +13,7 @@ function request(headers: Record<string, string> = {}, query: Record<string, str
 describe("website-facing endpoint authentication", () => {
   it("requires x-api-key for app work items", async () => {
     process.env.TRACEOPS_API_KEY = localDevKeyHash;
+    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
     process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
     const { listAppWorkItems } = await import("../src/functions/workitems.js");
 
@@ -23,6 +24,7 @@ describe("website-facing endpoint authentication", () => {
 
   it("requires x-api-key for admin user metrics", async () => {
     process.env.TRACEOPS_API_KEY = localDevKeyHash;
+    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
     process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
     const { getUserMetrics } = await import("../src/functions/admin.js");
 
@@ -33,6 +35,7 @@ describe("website-facing endpoint authentication", () => {
 
   it("requires x-api-key for admin issue metrics", async () => {
     process.env.TRACEOPS_API_KEY = localDevKeyHash;
+    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
     process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
     const { getIssueMetrics } = await import("../src/functions/admin.js");
 
@@ -43,6 +46,7 @@ describe("website-facing endpoint authentication", () => {
 
   it("requires x-api-key for admin request metrics", async () => {
     process.env.TRACEOPS_API_KEY = localDevKeyHash;
+    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
     process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
     const { getRequestMetrics } = await import("../src/functions/admin.js");
 

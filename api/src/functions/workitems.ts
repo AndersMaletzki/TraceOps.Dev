@@ -1,12 +1,16 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { ApiKeyService } from "../apiKeyService.js";
 import { AuthService } from "../authService.js";
 import { getConfig, TraceOpsConfig } from "../config.js";
+import { AuthContext } from "../domain.js";
 import {
   authenticate,
+  assertApiKeyScope,
+  assertAuthorizedTenant,
+  callerUserKeyFromAuth,
   errorResponse,
   json,
   parseAppWorkItemFiltersFromQuery,
-  parseCallerUserKey,
   parseClaimBody,
   parseFiltersFromQuery,
   parseLinksBody,
@@ -14,43 +18,61 @@ import {
   parseUpdateStatusBody,
   readJson
 } from "../http.js";
-import { TenantMemberRepository, TenantRepository, UserRepository, WorkItemRepository } from "../storage.js";
+import { ApiKeyRepository, TenantMemberRepository, TenantRepository, UserRepository, WorkItemRepository } from "../storage.js";
 import { parseCreateWorkItemInput } from "../validation.js";
 import { WorkItemService } from "../workItemService.js";
 
 let cachedConfig: TraceOpsConfig | undefined;
 let cachedService: WorkItemService | undefined;
+let cachedAuthService: AuthService | undefined;
+let cachedApiKeyService: ApiKeyService | undefined;
 
-function getService(): { config: TraceOpsConfig; service: WorkItemService } {
-  if (!cachedConfig || !cachedService) {
+function getService(): {
+  config: TraceOpsConfig;
+  service: WorkItemService;
+  authService: AuthService;
+  apiKeyService: ApiKeyService;
+} {
+  if (!cachedConfig || !cachedService || !cachedAuthService || !cachedApiKeyService) {
     cachedConfig = getConfig();
-    const authService = new AuthService(
+    cachedAuthService = new AuthService(
       new UserRepository(cachedConfig),
       new TenantRepository(cachedConfig),
       new TenantMemberRepository(cachedConfig)
     );
-    cachedService = new WorkItemService(new WorkItemRepository(cachedConfig), authService);
+    cachedService = new WorkItemService(new WorkItemRepository(cachedConfig), cachedAuthService);
+    cachedApiKeyService = new ApiKeyService(
+      new ApiKeyRepository(cachedConfig),
+      cachedAuthService,
+      cachedConfig.apiKeyHashSecret
+    );
   }
 
   return {
     config: cachedConfig,
-    service: cachedService
+    service: cachedService,
+    authService: cachedAuthService,
+    apiKeyService: cachedApiKeyService
   };
 }
 
 async function handle(
   request: HttpRequest,
-  operation: (service: WorkItemService) => Promise<HttpResponseInit>
+  operation: (
+    service: WorkItemService,
+    authService: AuthService,
+    auth: AuthContext
+  ) => Promise<HttpResponseInit>
 ): Promise<HttpResponseInit> {
   try {
-    const { config, service } = getService();
-    const authResponse = authenticate(request, config);
+    const { config, service, authService, apiKeyService } = getService();
+    const auth = await authenticate(request, config, apiKeyService);
 
-    if (authResponse) {
-      return authResponse;
+    if (!("kind" in auth)) {
+      return auth;
     }
 
-    return await operation(service);
+    return await operation(service, authService, auth);
   } catch (error) {
     return errorResponse(error);
   }
@@ -60,9 +82,18 @@ export async function createWorkItem(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service) => {
+  return handle(request, async (service, authService, auth) => {
     const body = await readJson(request);
-    const workItem = await service.create(parseCreateWorkItemInput(body));
+    const input = parseCreateWorkItemInput(body);
+
+    assertApiKeyScope(auth, "workitems:create");
+    assertAuthorizedTenant(auth, input.tenantId);
+
+    if (auth.kind === "personal") {
+      await authService.assertTenantMember(auth.userKey, input.tenantId);
+    }
+
+    const workItem = await service.create(input);
     return json(201, workItem);
   });
 }
@@ -71,8 +102,14 @@ export async function listWorkItems(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service) => {
-    const workItems = await service.list(parseFiltersFromQuery(request));
+  return handle(request, async (service, _authService, auth) => {
+    const filters = parseFiltersFromQuery(request);
+    filters.callerUserKey = callerUserKeyFromAuth(request, auth);
+
+    assertApiKeyScope(auth, "workitems:read");
+    assertAuthorizedTenant(auth, filters.tenantId);
+
+    const workItems = await service.list(filters);
     return json(200, { items: workItems, count: workItems.length });
   });
 }
@@ -81,12 +118,21 @@ export async function getWorkItem(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service) => {
+  return handle(request, async (service, _authService, auth) => {
     const workItemId = request.params.workItemId;
     const tenantId = request.query.get("tenantId");
     const repoId = request.query.get("repoId");
     const body = parseTenantRepoBody({ tenantId, repoId });
-    const workItem = await service.get(body.tenantId, body.repoId, workItemId, parseCallerUserKey(request));
+
+    assertApiKeyScope(auth, "workitems:read");
+    assertAuthorizedTenant(auth, body.tenantId);
+
+    const workItem = await service.get(
+      body.tenantId,
+      body.repoId,
+      workItemId,
+      callerUserKeyFromAuth(request, auth)
+    );
     return json(200, workItem);
   });
 }
@@ -95,8 +141,14 @@ export async function getNextWorkItem(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service) => {
-    const workItem = await service.getNext(parseFiltersFromQuery(request));
+  return handle(request, async (service, _authService, auth) => {
+    const filters = parseFiltersFromQuery(request);
+    filters.callerUserKey = callerUserKeyFromAuth(request, auth);
+
+    assertApiKeyScope(auth, "workitems:read");
+    assertAuthorizedTenant(auth, filters.tenantId);
+
+    const workItem = await service.getNext(filters);
     return workItem ? json(200, workItem) : json(404, { error: "No actionable work item found" });
   });
 }
@@ -105,9 +157,18 @@ export async function updateWorkItemStatus(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service) => {
+  return handle(request, async (service, authService, auth) => {
     const body = await readJson(request);
-    const workItem = await service.updateStatus(request.params.workItemId, parseUpdateStatusBody(body));
+    const input = parseUpdateStatusBody(body);
+
+    assertApiKeyScope(auth, "workitems:update");
+    assertAuthorizedTenant(auth, input.tenantId);
+
+    if (auth.kind === "personal") {
+      await authService.assertTenantMember(auth.userKey, input.tenantId);
+    }
+
+    const workItem = await service.updateStatus(request.params.workItemId, input);
     return json(200, workItem);
   });
 }
@@ -116,9 +177,18 @@ export async function claimWorkItem(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service) => {
+  return handle(request, async (service, authService, auth) => {
     const body = await readJson(request);
-    const workItem = await service.claim(request.params.workItemId, parseClaimBody(body));
+    const input = parseClaimBody(body);
+
+    assertApiKeyScope(auth, "workitems:update");
+    assertAuthorizedTenant(auth, input.tenantId);
+
+    if (auth.kind === "personal") {
+      await authService.assertTenantMember(auth.userKey, input.tenantId);
+    }
+
+    const workItem = await service.claim(request.params.workItemId, input);
     return json(200, workItem);
   });
 }
@@ -127,9 +197,18 @@ export async function updateWorkItemLinks(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service) => {
+  return handle(request, async (service, authService, auth) => {
     const body = await readJson(request);
-    const workItem = await service.updateLinks(request.params.workItemId, parseLinksBody(body));
+    const input = parseLinksBody(body);
+
+    assertApiKeyScope(auth, "workitems:update");
+    assertAuthorizedTenant(auth, input.tenantId);
+
+    if (auth.kind === "personal") {
+      await authService.assertTenantMember(auth.userKey, input.tenantId);
+    }
+
+    const workItem = await service.updateLinks(request.params.workItemId, input);
     return json(200, workItem);
   });
 }
@@ -138,7 +217,11 @@ export async function listAppWorkItems(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service) => {
+  return handle(request, async (service, _authService, auth) => {
+    if (auth.kind !== "global") {
+      return json(403, { error: "Trusted website authentication is required" });
+    }
+
     const filters = parseAppWorkItemFiltersFromQuery(request);
     return json(200, await service.listAppWorkItems(filters));
   });

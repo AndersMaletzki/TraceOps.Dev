@@ -1,4 +1,6 @@
 import {
+  apiKeyScopes,
+  ApiKeyScope,
   CreateWorkItemInput,
   SyncUserInput,
   workItemCategories,
@@ -163,5 +165,48 @@ export function parseSyncUserInput(value: unknown): SyncUserInput {
     userDetails: requiredString(body.userDetails, "userDetails"),
     displayName: optionalString(body.displayName, "displayName"),
     roles: requiredStringArray(body.roles, "roles").map((role) => role.toLowerCase())
+  };
+}
+
+function optionalUtcTimestamp(value: unknown, fieldName: string): string | undefined {
+  const timestamp = optionalString(value, fieldName);
+
+  if (!timestamp) {
+    return undefined;
+  }
+
+  if (!Number.isFinite(Date.parse(timestamp))) {
+    throw new ValidationError(`${fieldName} must be a valid ISO-8601 timestamp`);
+  }
+
+  return timestamp;
+}
+
+export function parseApiKeyScopes(value: unknown): ApiKeyScope[] {
+  if (value === undefined || value === null) {
+    return [...apiKeyScopes];
+  }
+
+  const scopes = requiredStringArray(value, "scopes");
+  const uniqueScopes = [...new Set(scopes)];
+
+  if (!uniqueScopes.every((scope) => apiKeyScopes.includes(scope as ApiKeyScope))) {
+    throw new ValidationError(`scopes must be one of: ${apiKeyScopes.join(", ")}`);
+  }
+
+  return uniqueScopes as ApiKeyScope[];
+}
+
+export function parseCreateApiKeyInput(value: unknown): {
+  name: string;
+  scopes: ApiKeyScope[];
+  expiresAtUtc?: string;
+} {
+  const body = requireRecord(value);
+
+  return {
+    name: requiredString(body.name, "name"),
+    scopes: parseApiKeyScopes(body.scopes),
+    expiresAtUtc: optionalUtcTimestamp(body.expiresAtUtc, "expiresAtUtc")
   };
 }
