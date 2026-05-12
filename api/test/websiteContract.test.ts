@@ -550,4 +550,199 @@ describe("website-facing contract freeze", () => {
       }
     });
   });
+
+  it("exposes the backend-owned admin health contract", async () => {
+    const { getHealth, setAdminModuleTestOverrides } = await import("../src/functions/admin.js");
+
+    setAdminModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        assertAdminUser: async (userKey: string) => {
+          expect(userKey).toBe("github|123456");
+        },
+        getUserMetrics: async () => {
+          throw new Error("not used");
+        },
+        getIssueMetrics: async () => {
+          throw new Error("not used");
+        },
+        getRequestMetrics: async () => {
+          throw new Error("not used");
+        },
+        getHealth: async () => ({
+          status: "ok",
+          checkedAtUtc: "2026-05-12T00:00:00.000Z",
+          storage: {
+            status: "ok",
+            tables: {
+              workItems: true,
+              workItemEvents: true,
+              users: true,
+              tenants: true,
+              tenantMembers: true,
+              apiKeys: true
+            }
+          },
+          telemetry: {
+            status: "ok",
+            logAnalyticsWorkspaceConfigured: true
+          },
+          runtimeConfig: {
+            status: "ok",
+            apiKeyResolved: true,
+            apiKeyHashSecretResolved: true,
+            storageConnectionStringResolved: true
+          }
+        }),
+        getDiagnostics: async () => {
+          throw new Error("not used");
+        }
+      }
+    });
+
+    const response = await getHealth(
+      request({
+        "x-api-key": "local-dev-key",
+        "x-traceops-user-key": "github|123456"
+      }),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        status: "ok",
+        checkedAtUtc: "2026-05-12T00:00:00.000Z",
+        storage: {
+          status: "ok",
+          tables: {
+            workItems: true,
+            workItemEvents: true,
+            users: true,
+            tenants: true,
+            tenantMembers: true,
+            apiKeys: true
+          }
+        },
+        telemetry: {
+          status: "ok",
+          logAnalyticsWorkspaceConfigured: true
+        },
+        runtimeConfig: {
+          status: "ok",
+          apiKeyResolved: true,
+          apiKeyHashSecretResolved: true,
+          storageConnectionStringResolved: true
+        }
+      }
+    });
+  });
+
+  it("exposes the backend-owned admin diagnostics contract", async () => {
+    const { getDiagnostics, setAdminModuleTestOverrides } = await import("../src/functions/admin.js");
+
+    setAdminModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        assertAdminUser: async (userKey: string) => {
+          expect(userKey).toBe("github|123456");
+        },
+        getUserMetrics: async () => {
+          throw new Error("not used");
+        },
+        getIssueMetrics: async () => {
+          throw new Error("not used");
+        },
+        getRequestMetrics: async () => {
+          throw new Error("not used");
+        },
+        getHealth: async () => {
+          throw new Error("not used");
+        },
+        getDiagnostics: async () => ({
+          checkedAtUtc: "2026-05-12T00:00:00.000Z",
+          health: {
+            status: "ok",
+            checkedAtUtc: "2026-05-12T00:00:00.000Z",
+            storage: {
+              status: "ok",
+              tables: {
+                workItems: true,
+                workItemEvents: true,
+                users: true,
+                tenants: true,
+                tenantMembers: true,
+                apiKeys: true
+              }
+            },
+            telemetry: {
+              status: "ok",
+              logAnalyticsWorkspaceConfigured: true
+            },
+            runtimeConfig: {
+              status: "ok",
+              apiKeyResolved: true,
+              apiKeyHashSecretResolved: true,
+              storageConnectionStringResolved: true
+            }
+          },
+          requestMetrics: {
+            requestsToday: 12,
+            requestsLast7Days: 42,
+            failedRequests: 3,
+            averageResponseDurationMs: 128.5
+          },
+          dependencies: {
+            storageTables: {
+              workItems: "WorkItems",
+              workItemEvents: "WorkItemEvents",
+              users: "TraceOpsUsers",
+              tenants: "TraceOpsTenants",
+              tenantMembers: "TraceOpsTenantMembers",
+              apiKeys: "TraceOpsApiKeys"
+            },
+            logAnalyticsWorkspaceConfigured: true,
+            requiredRuntimeConfigResolved: true
+          }
+        })
+      }
+    });
+
+    const response = await getDiagnostics(
+      request({
+        "x-api-key": "local-dev-key",
+        "x-traceops-user-key": "github|123456"
+      }),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        checkedAtUtc: "2026-05-12T00:00:00.000Z",
+        health: {
+          status: "ok",
+          checkedAtUtc: "2026-05-12T00:00:00.000Z"
+        },
+        requestMetrics: {
+          requestsToday: 12,
+          requestsLast7Days: 42,
+          failedRequests: 3,
+          averageResponseDurationMs: 128.5
+        },
+        dependencies: {
+          storageTables: {
+            workItems: "WorkItems",
+            workItemEvents: "WorkItemEvents",
+            users: "TraceOpsUsers",
+            tenants: "TraceOpsTenants",
+            tenantMembers: "TraceOpsTenantMembers",
+            apiKeys: "TraceOpsApiKeys"
+          },
+          logAnalyticsWorkspaceConfigured: true,
+          requiredRuntimeConfigResolved: true
+        }
+      }
+    });
+  });
 });

@@ -243,6 +243,58 @@ export type RequestMetrics = {
   averageResponseDurationMs: number;
 };
 
+export type AdminDependencyStatus = "ok" | "degraded";
+
+export type StorageDependencyHealth = {
+  status: AdminDependencyStatus;
+  tables: {
+    workItems: boolean;
+    workItemEvents: boolean;
+    users: boolean;
+    tenants: boolean;
+    tenantMembers: boolean;
+    apiKeys: boolean;
+  };
+};
+
+export type TelemetryDependencyHealth = {
+  status: AdminDependencyStatus;
+  logAnalyticsWorkspaceConfigured: boolean;
+};
+
+export type RuntimeConfigHealth = {
+  status: AdminDependencyStatus;
+  apiKeyResolved: boolean;
+  apiKeyHashSecretResolved: boolean;
+  storageConnectionStringResolved: boolean;
+};
+
+export type AdminHealth = {
+  status: AdminDependencyStatus;
+  checkedAtUtc: string;
+  storage: StorageDependencyHealth;
+  telemetry: TelemetryDependencyHealth;
+  runtimeConfig: RuntimeConfigHealth;
+};
+
+export type AdminDiagnostics = {
+  checkedAtUtc: string;
+  health: AdminHealth;
+  requestMetrics: RequestMetrics | null;
+  dependencies: {
+    storageTables: {
+      workItems: string;
+      workItemEvents: string;
+      users: string;
+      tenants: string;
+      tenantMembers: string;
+      apiKeys: string;
+    };
+    logAnalyticsWorkspaceConfigured: boolean;
+    requiredRuntimeConfigResolved: boolean;
+  };
+};
+
 export type UpdateStatusInput = {
   tenantId: string;
   repoId: string;

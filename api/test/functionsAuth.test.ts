@@ -54,4 +54,26 @@ describe("website-facing endpoint authentication", () => {
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
   });
+
+  it("requires x-api-key for admin health", async () => {
+    process.env.TRACEOPS_API_KEY = localDevKeyHash;
+    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
+    process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
+    const { getHealth } = await import("../src/functions/admin.js");
+
+    const response = await getHealth(request(), {} as never);
+
+    expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
+  });
+
+  it("requires x-api-key for admin diagnostics", async () => {
+    process.env.TRACEOPS_API_KEY = localDevKeyHash;
+    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
+    process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
+    const { getDiagnostics } = await import("../src/functions/admin.js");
+
+    const response = await getDiagnostics(request(), {} as never);
+
+    expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
+  });
 });

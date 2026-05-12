@@ -172,6 +172,206 @@ describe("AdminMetricsService", () => {
     );
   });
 
+  it("reports backend-owned health across existing dependencies", async () => {
+    const service = new AdminMetricsService(
+      { getUser: async () => user({ isAdmin: true }), listUsers: async () => [] },
+      { listAllWorkItems: async () => [] },
+      {
+        getRequestMetrics: async () => ({
+          requestsToday: 12,
+          requestsLast7Days: 42,
+          failedRequests: 3,
+          averageResponseDurationMs: 128.5
+        })
+      },
+      "workspace-id",
+      {
+        getStorageHealth: async () => ({
+          status: "ok",
+          tables: {
+            workItems: true,
+            workItemEvents: true,
+            users: true,
+            tenants: true,
+            tenantMembers: true,
+            apiKeys: true
+          }
+        })
+      },
+      {
+        apiKey: "hash",
+        apiKeyHashSecret: "super-secret",
+        storageConnectionString: "UseDevelopmentStorage=true",
+        workItemsTableName: "WorkItems",
+        workItemEventsTableName: "WorkItemEvents",
+        usersTableName: "TraceOpsUsers",
+        tenantsTableName: "TraceOpsTenants",
+        tenantMembersTableName: "TraceOpsTenantMembers",
+        apiKeysTableName: "TraceOpsApiKeys"
+      }
+    );
+
+    await expect(service.getHealth(now)).resolves.toEqual({
+      status: "ok",
+      checkedAtUtc: "2026-05-05T12:00:00.000Z",
+      storage: {
+        status: "ok",
+        tables: {
+          workItems: true,
+          workItemEvents: true,
+          users: true,
+          tenants: true,
+          tenantMembers: true,
+          apiKeys: true
+        }
+      },
+      telemetry: {
+        status: "ok",
+        logAnalyticsWorkspaceConfigured: true
+      },
+      runtimeConfig: {
+        status: "ok",
+        apiKeyResolved: true,
+        apiKeyHashSecretResolved: true,
+        storageConnectionStringResolved: true
+      }
+    });
+  });
+
+  it("reports additive diagnostics without requiring new resources", async () => {
+    const service = new AdminMetricsService(
+      { getUser: async () => user({ isAdmin: true }), listUsers: async () => [] },
+      { listAllWorkItems: async () => [] },
+      {
+        getRequestMetrics: async () => ({
+          requestsToday: 12,
+          requestsLast7Days: 42,
+          failedRequests: 3,
+          averageResponseDurationMs: 128.5
+        })
+      },
+      "workspace-id",
+      {
+        getStorageHealth: async () => ({
+          status: "ok",
+          tables: {
+            workItems: true,
+            workItemEvents: true,
+            users: true,
+            tenants: true,
+            tenantMembers: true,
+            apiKeys: true
+          }
+        })
+      },
+      {
+        apiKey: "hash",
+        apiKeyHashSecret: "super-secret",
+        storageConnectionString: "UseDevelopmentStorage=true",
+        workItemsTableName: "WorkItems",
+        workItemEventsTableName: "WorkItemEvents",
+        usersTableName: "TraceOpsUsers",
+        tenantsTableName: "TraceOpsTenants",
+        tenantMembersTableName: "TraceOpsTenantMembers",
+        apiKeysTableName: "TraceOpsApiKeys"
+      }
+    );
+
+    await expect(service.getDiagnostics(now)).resolves.toEqual({
+      checkedAtUtc: "2026-05-05T12:00:00.000Z",
+      health: {
+        status: "ok",
+        checkedAtUtc: "2026-05-05T12:00:00.000Z",
+        storage: {
+          status: "ok",
+          tables: {
+            workItems: true,
+            workItemEvents: true,
+            users: true,
+            tenants: true,
+            tenantMembers: true,
+            apiKeys: true
+          }
+        },
+        telemetry: {
+          status: "ok",
+          logAnalyticsWorkspaceConfigured: true
+        },
+        runtimeConfig: {
+          status: "ok",
+          apiKeyResolved: true,
+          apiKeyHashSecretResolved: true,
+          storageConnectionStringResolved: true
+        }
+      },
+      requestMetrics: {
+        requestsToday: 12,
+        requestsLast7Days: 42,
+        failedRequests: 3,
+        averageResponseDurationMs: 128.5
+      },
+      dependencies: {
+        storageTables: {
+          workItems: "WorkItems",
+          workItemEvents: "WorkItemEvents",
+          users: "TraceOpsUsers",
+          tenants: "TraceOpsTenants",
+          tenantMembers: "TraceOpsTenantMembers",
+          apiKeys: "TraceOpsApiKeys"
+        },
+        logAnalyticsWorkspaceConfigured: true,
+        requiredRuntimeConfigResolved: true
+      }
+    });
+  });
+
+  it("degrades health when telemetry or storage wiring is missing", async () => {
+    const service = new AdminMetricsService(
+      { getUser: async () => user({ isAdmin: true }), listUsers: async () => [] },
+      { listAllWorkItems: async () => [] },
+      undefined,
+      undefined,
+      {
+        getStorageHealth: async () => ({
+          status: "degraded",
+          tables: {
+            workItems: true,
+            workItemEvents: false,
+            users: true,
+            tenants: true,
+            tenantMembers: true,
+            apiKeys: true
+          }
+        })
+      },
+      {
+        apiKey: "hash",
+        apiKeyHashSecret: "super-secret",
+        storageConnectionString: "UseDevelopmentStorage=true",
+        workItemsTableName: "WorkItems",
+        workItemEventsTableName: "WorkItemEvents",
+        usersTableName: "TraceOpsUsers",
+        tenantsTableName: "TraceOpsTenants",
+        tenantMembersTableName: "TraceOpsTenantMembers",
+        apiKeysTableName: "TraceOpsApiKeys"
+      }
+    );
+
+    await expect(service.getHealth(now)).resolves.toMatchObject({
+      status: "degraded",
+      storage: {
+        status: "degraded",
+        tables: {
+          workItemEvents: false
+        }
+      },
+      telemetry: {
+        status: "degraded",
+        logAnalyticsWorkspaceConfigured: false
+      }
+    });
+  });
+
   it("rejects non-admin callers for admin metrics authorization", async () => {
     const service = new AdminMetricsService(
       { getUser: async () => user({ isAdmin: false }), listUsers: async () => [] },

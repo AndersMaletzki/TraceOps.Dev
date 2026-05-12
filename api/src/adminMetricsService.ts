@@ -1,6 +1,19 @@
 import { DefaultAzureCredential } from "@azure/identity";
+import { TableClient } from "@azure/data-tables";
 import { LogsQueryClient, LogsQueryResultStatus } from "@azure/monitor-query-logs";
-import { IssueMetrics, RequestMetrics, TraceOpsUser, UserMetrics, WorkItem } from "./domain.js";
+import {
+  AdminDiagnostics,
+  AdminHealth,
+  IssueMetrics,
+  RequestMetrics,
+  RuntimeConfigHealth,
+  StorageDependencyHealth,
+  TelemetryDependencyHealth,
+  TraceOpsUser,
+  UserMetrics,
+  WorkItem
+} from "./domain.js";
+import { TraceOpsConfig } from "./config.js";
 import { isStorageNotFound, toWorkItem, UserRepository, WorkItemRepository } from "./storage.js";
 
 type UserStore = Pick<UserRepository, "getUser" | "listUsers">;
@@ -17,6 +30,10 @@ type LogsQuerySuccess = {
 
 export type RequestTelemetryStore = {
   getRequestMetrics(workspaceId: string): Promise<RequestMetrics>;
+};
+
+export type AdminDependencyStore = {
+  getStorageHealth(): Promise<StorageDependencyHealth>;
 };
 
 export class AdminAccessDeniedError extends Error {
@@ -74,6 +91,51 @@ AppRequests
   }
 }
 
+type ProbeKey = keyof StorageDependencyHealth["tables"];
+
+async function tableResponds(client: TableClient): Promise<boolean> {
+  for await (const _entity of client.listEntities()) {
+    break;
+  }
+
+  return true;
+}
+
+export class AzureTableAdminDependencyStore implements AdminDependencyStore {
+  private readonly tableClients: Record<ProbeKey, TableClient>;
+
+  constructor(config: TraceOpsConfig) {
+    this.tableClients = {
+      workItems: TableClient.fromConnectionString(config.storageConnectionString, config.workItemsTableName),
+      workItemEvents: TableClient.fromConnectionString(config.storageConnectionString, config.workItemEventsTableName),
+      users: TableClient.fromConnectionString(config.storageConnectionString, config.usersTableName),
+      tenants: TableClient.fromConnectionString(config.storageConnectionString, config.tenantsTableName),
+      tenantMembers: TableClient.fromConnectionString(config.storageConnectionString, config.tenantMembersTableName),
+      apiKeys: TableClient.fromConnectionString(config.storageConnectionString, config.apiKeysTableName)
+    };
+  }
+
+  async getStorageHealth(): Promise<StorageDependencyHealth> {
+    const results = await Promise.all(
+      (Object.entries(this.tableClients) as [ProbeKey, TableClient][]).map(async ([key, client]) => {
+        try {
+          await tableResponds(client);
+          return [key, true] as const;
+        } catch {
+          return [key, false] as const;
+        }
+      })
+    );
+
+    const tables = Object.fromEntries(results) as StorageDependencyHealth["tables"];
+
+    return {
+      status: Object.values(tables).every(Boolean) ? "ok" : "degraded",
+      tables
+    };
+  }
+}
+
 export function requestMetricsFromLogsResult(result: LogsQuerySuccess): RequestMetrics {
   if (result.status !== LogsQueryResultStatus.Success) {
     throw new Error("Application Insights request metrics query failed");
@@ -94,7 +156,20 @@ export class AdminMetricsService {
     private readonly users: UserStore,
     private readonly workItems: WorkItemStore,
     private readonly requestTelemetry?: RequestTelemetryStore,
-    private readonly logAnalyticsWorkspaceId?: string
+    private readonly logAnalyticsWorkspaceId?: string,
+    private readonly dependencies?: AdminDependencyStore,
+    private readonly config?: Pick<
+      TraceOpsConfig,
+      | "apiKey"
+      | "apiKeyHashSecret"
+      | "storageConnectionString"
+      | "workItemsTableName"
+      | "workItemEventsTableName"
+      | "usersTableName"
+      | "tenantsTableName"
+      | "tenantMembersTableName"
+      | "apiKeysTableName"
+    >
   ) {}
 
   async assertAdminUser(userKey: string): Promise<void> {
@@ -152,6 +227,92 @@ export class AdminMetricsService {
     }
 
     return this.requestTelemetry.getRequestMetrics(this.logAnalyticsWorkspaceId);
+  }
+
+  async getHealth(now = new Date()): Promise<AdminHealth> {
+    const [storage, telemetry, runtimeConfig] = await Promise.all([
+      this.getStorageHealth(),
+      Promise.resolve(this.getTelemetryHealth()),
+      Promise.resolve(this.getRuntimeConfigHealth())
+    ]);
+
+    return {
+      status:
+        storage.status === "ok" && telemetry.status === "ok" && runtimeConfig.status === "ok"
+          ? "ok"
+          : "degraded",
+      checkedAtUtc: now.toISOString(),
+      storage,
+      telemetry,
+      runtimeConfig
+    };
+  }
+
+  async getDiagnostics(now = new Date()): Promise<AdminDiagnostics> {
+    const health = await this.getHealth(now);
+    const runtimeConfig = this.getRuntimeConfigHealth();
+    const requestMetrics =
+      this.requestTelemetry && this.logAnalyticsWorkspaceId
+        ? await this.requestTelemetry.getRequestMetrics(this.logAnalyticsWorkspaceId).catch(() => null)
+        : null;
+
+    return {
+      checkedAtUtc: now.toISOString(),
+      health,
+      requestMetrics,
+      dependencies: {
+        storageTables: {
+          workItems: this.config?.workItemsTableName || "",
+          workItemEvents: this.config?.workItemEventsTableName || "",
+          users: this.config?.usersTableName || "",
+          tenants: this.config?.tenantsTableName || "",
+          tenantMembers: this.config?.tenantMembersTableName || "",
+          apiKeys: this.config?.apiKeysTableName || ""
+        },
+        logAnalyticsWorkspaceConfigured: Boolean(this.logAnalyticsWorkspaceId),
+        requiredRuntimeConfigResolved:
+          runtimeConfig.apiKeyResolved &&
+          runtimeConfig.apiKeyHashSecretResolved &&
+          runtimeConfig.storageConnectionStringResolved
+      }
+    };
+  }
+
+  private async getStorageHealth(): Promise<StorageDependencyHealth> {
+    if (!this.dependencies) {
+      return {
+        status: "degraded",
+        tables: {
+          workItems: false,
+          workItemEvents: false,
+          users: false,
+          tenants: false,
+          tenantMembers: false,
+          apiKeys: false
+        }
+      };
+    }
+
+    return this.dependencies.getStorageHealth();
+  }
+
+  private getTelemetryHealth(): TelemetryDependencyHealth {
+    return {
+      status: this.logAnalyticsWorkspaceId ? "ok" : "degraded",
+      logAnalyticsWorkspaceConfigured: Boolean(this.logAnalyticsWorkspaceId)
+    };
+  }
+
+  private getRuntimeConfigHealth(): RuntimeConfigHealth {
+    return {
+      status:
+        this.config?.apiKey && this.config.apiKeyHashSecret && this.config.storageConnectionString
+          ? "ok"
+          : "degraded",
+      apiKeyResolved: Boolean(this.config?.apiKey),
+      apiKeyHashSecretResolved: Boolean(this.config?.apiKeyHashSecret),
+      storageConnectionStringResolved: Boolean(this.config?.storageConnectionString)
+    };
   }
 }
 

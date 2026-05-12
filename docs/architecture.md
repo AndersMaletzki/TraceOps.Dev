@@ -93,6 +93,8 @@ GET   /app/workitems
 GET   /app/admin/metrics/users
 GET   /app/admin/metrics/issues
 GET   /app/admin/metrics/requests
+GET   /app/admin/health
+GET   /app/admin/diagnostics
 ```
 
 ## Website-Facing Contract Freeze
@@ -112,12 +114,14 @@ Website-consumed backend routes currently owned by the existing Azure Function A
 | `/app/admin/metrics/users` | `GET` | `x-api-key` + caller user header | Read admin-only user metrics |
 | `/app/admin/metrics/issues` | `GET` | `x-api-key` + caller user header | Read admin-only issue metrics |
 | `/app/admin/metrics/requests` | `GET` | `x-api-key` + caller user header | Read admin-only request diagnostics metrics |
+| `/app/admin/health` | `GET` | `x-api-key` + caller user header | Read admin-only backend health for existing runtime dependencies |
+| `/app/admin/diagnostics` | `GET` | `x-api-key` + caller user header | Read admin-only backend diagnostics for existing runtime dependencies |
 
 Current website-facing health and diagnostics scope:
 
-- There is no dedicated public website-facing health route in the current backend contract.
-- There is no separate public diagnostics HTTP route beyond `GET /app/admin/metrics/requests`.
-- Operational health still exists through Azure Functions and Application Insights platform telemetry, but that platform surface is not part of the website-facing API contract freeze.
+- There is no dedicated public unauthenticated health route in the backend contract.
+- Health and diagnostics are owned by the existing Azure Function App through admin-only routes.
+- Operational health still exists through Azure Functions and Application Insights platform telemetry, and the backend now exposes additive admin-only contract routes that summarize that existing runtime wiring without introducing new resources.
 
 `tenantId` and `repoId` are required for MCP-style repository work item operations so queries stay inside one Table Storage partition. The website-facing `GET /app/workitems` endpoint accepts optional `tenantId` and `repoId`. When `tenantId` is omitted, TraceOps.Dev resolves the caller's active tenant from backend-owned membership data and returns tenant-scoped `repositoryOptions` from API-owned work item data.
 
@@ -144,6 +148,17 @@ Admin metrics endpoints are backend-owned website contracts exposed by the exist
 - `GET /app/admin/metrics/users`: `totalUsers`, `githubUsers`, `microsoftUsers`, `adminUsers`, `usersCreatedLast7Days`, `activeUsersLast30Days`
 - `GET /app/admin/metrics/issues`: `totalIssues`, `openIssues`, `fixedIssues`, `closedIssues`, `issuesCreatedLast7Days`
 - `GET /app/admin/metrics/requests`: `requestsToday`, `requestsLast7Days`, `failedRequests`, `averageResponseDurationMs`
+
+Admin health and diagnostics are also backend-owned website contracts exposed by the existing Azure Function App. These endpoints are additive and keep rollback simple because they only summarize the existing runtime dependencies already used by TraceOps.Dev:
+
+- existing Azure Table Storage tables already used by the product backend
+- existing Application Insights / Log Analytics request telemetry wiring
+- existing runtime configuration already resolved into Function App settings, including production Key Vault references
+
+They do not create or require API Management, Front Door, Container Apps, new identities, or new telemetry resources.
+
+- `GET /app/admin/health`: `status`, `checkedAtUtc`, `storage`, `telemetry`, `runtimeConfig`
+- `GET /app/admin/diagnostics`: `checkedAtUtc`, `health`, `requestMetrics`, `dependencies`
 
 Frozen request and response shapes for website-facing routes:
 
@@ -172,6 +187,10 @@ Frozen request and response shapes for website-facing routes:
   Response body: `totalIssues`, `openIssues`, `fixedIssues`, `closedIssues`, `issuesCreatedLast7Days`
 - `GET /app/admin/metrics/requests`
   Response body: `requestsToday`, `requestsLast7Days`, `failedRequests`, `averageResponseDurationMs`
+- `GET /app/admin/health`
+  Response body: `status`, `checkedAtUtc`, `storage`, `telemetry`, `runtimeConfig`
+- `GET /app/admin/diagnostics`
+  Response body: `checkedAtUtc`, `health`, `requestMetrics`, `dependencies`
 
 Website and backend integrations must use stable provider identity, represented by `identityProvider` + `providerUserId`. Email may be stored as user detail or display metadata, but integrations must not use email as the primary identity because emails can change and are not guaranteed to be unique across providers.
 
