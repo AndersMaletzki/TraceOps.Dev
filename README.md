@@ -18,6 +18,21 @@ v0.1 does not create branches, push commits, open PRs, modify repositories, impl
 
 ## Product Ownership Boundaries
 
+TraceOps.Dev backend is the sole owner of the public backend surface for the product. The existing Azure Function App owns:
+
+- API endpoints and request validation
+- `Users`
+- `Tenants`
+- `TenantMembers`
+- `WorkItems`
+- `WorkItemEvents`
+- admin endpoints
+- API key handling
+- storage reads and writes
+- tenant validation and tenant-scoped authorization
+- diagnostics and metrics endpoints
+- MCP integration contracts exposed by the bundled MCP server
+
 TraceOps.Dev owns its product data:
 
 - `Users`
@@ -220,7 +235,7 @@ The raw personal API key is returned only once at creation time. The stored enti
 
 ## Website Proxy Contract
 
-TraceOps.Dev-website is a thin server-side proxy for product data. It calls TraceOps.Dev API with `TRACEOPS_API_BASE_URL` and the raw `TRACEOPS_API_KEY`; browser code must never receive that key and must never read or write TraceOps product tables directly. The TraceOps.Dev API owns users, tenants, tenant memberships, work items, work item events, and tenant-scoped authorization decisions.
+TraceOps.Dev-website is a thin server-side proxy for product data. It calls TraceOps.Dev API with `TRACEOPS_API_BASE_URL` and the raw `TRACEOPS_API_KEY`; browser code must never receive that key and must never read or write TraceOps product tables directly. The TraceOps.Dev API is the sole owner of backend routes, users, tenants, tenant memberships, work items, work item events, admin endpoints, API key handling, tenant validation, diagnostics/metrics, and storage access for product data.
 
 All website proxy calls require:
 
@@ -280,6 +295,16 @@ Admin metrics endpoints require `x-api-key`:
 - `GET /api/app/admin/metrics/requests`
 
 They also require `x-traceops-user-key` for a TraceOps user whose stored `isAdmin` flag is `true`.
+
+Current tenant-management scope is intentionally narrow:
+
+- `POST /api/auth/sync-user` creates or updates the TraceOps user record from trusted backend identity input
+- `POST /api/auth/sync-user` ensures the caller's personal tenant exists
+- `POST /api/auth/sync-user` ensures an `owner` membership exists for that personal tenant
+- `GET /api/app/workitems` reads tenant-scoped work items only after backend membership validation
+- `POST|GET|DELETE /api/me/api-keys` manage personal API keys for the authenticated caller inside the selected tenant
+
+The current backend does not expose general-purpose public endpoints for tenant creation, tenant updates, tenant deletion, tenant member invites, tenant member removal, or arbitrary tenant role management.
 
 ## Personal API Key Flow
 
@@ -381,6 +406,8 @@ Available tools:
 - `update_workitem_links`
 
 Tool responses are intentionally concise. Work item tools require `repoId`. `tenantId` may be omitted when `TRACEOPS_DEFAULT_TENANT_ID` is configured; explicit `tenantId` values still override the default. The MCP server does not provide a global default `repoId`.
+
+The MCP server is an integration layer over the existing backend API. It is not a second source of truth for users, tenants, work items, storage, or authorization.
 
 ## Infrastructure
 
@@ -536,7 +563,7 @@ Event types:
 - `Assigned`
 - `CommentAdded`
 
-Users, tenants, tenant membership, work items, and work item events are product-owned data in TraceOps.Dev. The website is not the source of truth for users, tenants, tenant membership, or work item access.
+Users, tenants, tenant membership, work items, and work item events are product-owned data in TraceOps.Dev. The website is not the source of truth for users, tenants, tenant membership, work item access, API keys, admin metrics, or backend route behavior.
 
 The website syncs authenticated users through `POST /api/auth/sync-user`. The website backend must derive `identityProvider`, `providerUserId`, `userDetails`, `displayName`, and `roles` from trusted Azure Static Web Apps auth headers before calling the TraceOps API with `x-api-key`. Email addresses may be stored for contact or display metadata, but they must not be used as primary identity keys.
 
@@ -602,3 +629,5 @@ Allowed tenant member roles:
 - `viewer`
 
 Tenant membership controls access to work items. Browser clients may request work items for a tenant only through a trusted backend path that verifies the caller's membership; they must not be able to grant themselves tenant access by submitting a `tenantId`.
+
+Current tenant-management support is limited to personal tenant bootstrap through `POST /api/auth/sync-user`, membership-backed work item access, and tenant-scoped personal API key management. Broader tenant administration flows are not part of the current public backend surface.

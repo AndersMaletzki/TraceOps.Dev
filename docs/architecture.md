@@ -34,6 +34,20 @@ TraceOps.Dev v0.1 supports:
 
 ## Product Data Ownership
 
+TraceOps.Dev backend is the sole owner of the product backend surface. The existing Azure Function App owns:
+
+- API endpoints and request validation
+- users
+- tenants
+- tenant memberships
+- work items
+- admin endpoints
+- API key handling
+- product storage access
+- tenant validation and tenant-scoped authorization
+- diagnostics and metrics endpoints
+- MCP integration contracts exposed by the bundled MCP server
+
 TraceOps.Dev owns the product data required to run repository workflow tracking:
 
 - `Users`
@@ -42,7 +56,7 @@ TraceOps.Dev owns the product data required to run repository workflow tracking:
 - `WorkItems`
 - `WorkItemEvents`
 
-The website, MCP server, and other clients integrate with TraceOps.Dev; they are not the source of truth for users, tenants, tenant membership, work item access, or workflow state.
+The website, MCP server, and other clients integrate with TraceOps.Dev; they are not the source of truth for users, tenants, tenant membership, work item access, API keys, admin metrics, or workflow state.
 
 TraceOps.Dev is open-source friendly. Repository schemas, infrastructure templates, and API contracts can be public. Real user data, tenant data, membership data, secrets, API keys, connection strings, and production identifiers must remain private.
 
@@ -58,6 +72,8 @@ TraceOps.Dev v0.1 does not support:
 - advanced auth
 - GitHub Apps
 - dashboards or UI
+- general-purpose tenant CRUD endpoints
+- general-purpose tenant membership management endpoints
 
 ## API
 
@@ -85,6 +101,16 @@ GET   /app/admin/metrics/requests
 TraceOps.Dev-website is a thin server-side proxy. It sends `x-api-key` and, for app reads, `x-traceops-user-key` derived from trusted auth context. Browser code never receives `TRACEOPS_API_KEY` and never reads or writes product Table Storage directly. Product authorization belongs in TraceOps.Dev API; the website must not duplicate tenant membership validation as the source of truth.
 
 `GET /app/workitems` validates the caller's tenant membership before returning tenant-scoped data. Its response includes `caller`, `activeTenant`, `repoId`, `repositoryOptions`, `items`, and `count`.
+
+Current tenant-management scope is intentionally limited to:
+
+- syncing a trusted authenticated user into TraceOps product records
+- ensuring a personal tenant exists for that user
+- ensuring an `owner` membership exists for that personal tenant
+- validating tenant membership before app-facing work item reads
+- managing personal API keys inside a tenant context
+
+The current backend does not expose public endpoints for arbitrary tenant creation, tenant updates, tenant deletion, tenant invites, tenant member removal, or tenant role administration beyond the membership data it maintains internally.
 
 Admin metrics endpoints require `x-api-key` and `x-traceops-user-key` for a stored TraceOps user with `isAdmin = true`. Product metrics aggregate from TraceOps-owned storage; request metrics query Application Insights telemetry from Log Analytics with the Function App managed identity.
 
@@ -213,6 +239,8 @@ Append-only event types:
 - `LinksUpdated`
 - `Assigned`
 - `CommentAdded`
+
+Supported taxonomy in the current backend is exactly the enum set implemented in the API and MCP contracts. Public docs should treat these values as the current supported scope, not as an open-ended taxonomy.
 
 ## Coordination Rules
 
