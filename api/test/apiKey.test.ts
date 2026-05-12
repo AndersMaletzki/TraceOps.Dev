@@ -51,7 +51,15 @@ function createApiKeyService() {
   >;
 
   const authService = {
-    assertTenantMember: async (_userKey: string, _tenantId: string) => undefined
+    assertTenantMember: async (_userKey: string, _tenantId: string) => undefined,
+    listUserTenants: async (_userKey: string) => [
+      {
+        tenantId: "personal~github~123456",
+        userKey: "github|123456",
+        role: "owner" as const,
+        createdAtUtc: ""
+      }
+    ]
   };
 
   return {
@@ -147,5 +155,11 @@ describe("ApiKeyService", () => {
     await expect(service.authenticatePersonalApiKey(created.apiKey)).rejects.toBeInstanceOf(
       ApiKeyAuthenticationError
     );
+  });
+
+  it("resolves the personal tenant for caller-managed API key routes", async () => {
+    const { service } = createApiKeyService();
+
+    await expect(service.resolveTenantIdForUser("github|123456")).resolves.toBe("personal~github~123456");
   });
 });

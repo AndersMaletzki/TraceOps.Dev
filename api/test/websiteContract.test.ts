@@ -8,6 +8,7 @@ const localDevKeyHash = "ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd
 function request(headers: Record<string, string> = {}, body?: unknown): HttpRequest {
   return {
     headers: new Headers(headers),
+    query: new URLSearchParams(),
     json: async () => body
   } as unknown as HttpRequest;
 }
@@ -28,7 +29,11 @@ function configWithApiKey(apiKey: string): TraceOpsConfig {
 
 afterEach(async () => {
   const { setAuthModuleTestOverrides } = await import("../src/functions/auth.js");
+  const { setApiKeysModuleTestOverrides } = await import("../src/functions/apiKeys.js");
+  const { setWorkItemsModuleTestOverrides } = await import("../src/functions/workitems.js");
   setAuthModuleTestOverrides(undefined);
+  setApiKeysModuleTestOverrides(undefined);
+  setWorkItemsModuleTestOverrides(undefined);
 });
 
 describe("website-facing contract freeze", () => {
@@ -201,11 +206,43 @@ describe("website-facing contract freeze", () => {
     });
   });
 
-  it("requires trusted tenant headers to list personal API keys", async () => {
-    process.env.TRACEOPS_API_KEY = localDevKeyHash;
-    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
-    process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
-    const { listApiKeys } = await import("../src/functions/apiKeys.js");
+  it("derives the active tenant when listing personal API keys without a tenant header", async () => {
+    const { listApiKeys, setApiKeysModuleTestOverrides } = await import("../src/functions/apiKeys.js");
+
+    setApiKeysModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        resolveTenantIdForUser: async (userKey: string, tenantId?: string) => {
+          expect(userKey).toBe("github|123456");
+          expect(tenantId).toBeUndefined();
+          return "personal~github~123456";
+        },
+        createApiKey: async () => {
+          throw new Error("not used");
+        },
+        listApiKeysForUser: async (tenantId: string, userKey: string) => {
+          expect(tenantId).toBe("personal~github~123456");
+          expect(userKey).toBe("github|123456");
+          return [
+            {
+              apiKeyId: "key_123",
+              tenantId,
+              userKey,
+              name: "Codex CLI",
+              keyPrefix: "abc123def456",
+              scopes: ["workitems:read"],
+              createdAtUtc: "2026-05-12T00:00:00.000Z",
+              expiresAtUtc: "",
+              lastUsedAtUtc: "",
+              revokedAtUtc: ""
+            }
+          ];
+        },
+        revokeApiKey: async () => {
+          throw new Error("not used");
+        }
+      }
+    });
 
     const response = await listApiKeys(
       request({
@@ -216,16 +253,52 @@ describe("website-facing contract freeze", () => {
     );
 
     expect(response).toMatchObject({
-      status: 400,
-      jsonBody: { error: "x-traceops-tenant-id is required" }
+      status: 200,
+      jsonBody: {
+        items: [
+          {
+            apiKeyId: "key_123",
+            tenantId: "personal~github~123456",
+            userKey: "github|123456",
+            name: "Codex CLI"
+          }
+        ]
+      }
     });
   });
 
-  it("requires trusted tenant headers to revoke personal API keys", async () => {
-    process.env.TRACEOPS_API_KEY = localDevKeyHash;
-    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
-    process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
-    const { revokeApiKey } = await import("../src/functions/apiKeys.js");
+  it("derives the active tenant when revoking a personal API key without a tenant header", async () => {
+    const { revokeApiKey, setApiKeysModuleTestOverrides } = await import("../src/functions/apiKeys.js");
+
+    setApiKeysModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        resolveTenantIdForUser: async () => "personal~github~123456",
+        createApiKey: async () => {
+          throw new Error("not used");
+        },
+        listApiKeysForUser: async () => {
+          throw new Error("not used");
+        },
+        revokeApiKey: async (tenantId: string, userKey: string, apiKeyId: string) => {
+          expect(tenantId).toBe("personal~github~123456");
+          expect(userKey).toBe("github|123456");
+          expect(apiKeyId).toBe("key_123");
+          return {
+            apiKeyId,
+            tenantId,
+            userKey,
+            name: "Codex CLI",
+            keyPrefix: "abc123def456",
+            scopes: ["workitems:read"],
+            createdAtUtc: "2026-05-12T00:00:00.000Z",
+            expiresAtUtc: "",
+            lastUsedAtUtc: "",
+            revokedAtUtc: "2026-05-12T01:00:00.000Z"
+          };
+        }
+      }
+    });
 
     const response = await revokeApiKey(
       {
@@ -239,8 +312,105 @@ describe("website-facing contract freeze", () => {
     );
 
     expect(response).toMatchObject({
-      status: 400,
-      jsonBody: { error: "x-traceops-tenant-id is required" }
+      status: 200,
+      jsonBody: {
+        apiKeyId: "key_123",
+        tenantId: "personal~github~123456",
+        userKey: "github|123456",
+        revokedAtUtc: "2026-05-12T01:00:00.000Z"
+      }
+    });
+  });
+
+  it("keeps the app workitems response shape while using backend-owned tenant resolution", async () => {
+    const { listAppWorkItems, setWorkItemsModuleTestOverrides } = await import("../src/functions/workitems.js");
+
+    setWorkItemsModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        create: async () => {
+          throw new Error("not used");
+        },
+        list: async () => {
+          throw new Error("not used");
+        },
+        get: async () => {
+          throw new Error("not used");
+        },
+        getNext: async () => {
+          throw new Error("not used");
+        },
+        updateStatus: async () => {
+          throw new Error("not used");
+        },
+        claim: async () => {
+          throw new Error("not used");
+        },
+        updateLinks: async () => {
+          throw new Error("not used");
+        },
+        listAppWorkItems: async (filters) => {
+          expect(filters).toMatchObject({
+            callerUserKey: "github|123456",
+            tenantId: undefined,
+            repoId: undefined
+          });
+          return {
+            caller: { userKey: "github|123456" },
+            activeTenant: {
+              tenantId: "personal~github~123456",
+              tenantType: "personal",
+              name: "Octo Cat",
+              createdByUserKey: "github|123456",
+              createdAtUtc: "2026-05-12T00:00:00.000Z"
+            },
+            repoId: null,
+            repositoryOptions: [
+              {
+                tenantId: "personal~github~123456",
+                repoId: "AndersMaletzki/TraceOps.Dev",
+                label: "AndersMaletzki/TraceOps.Dev"
+              }
+            ],
+            items: [],
+            count: 0
+          };
+        }
+      },
+      authService: {
+        assertTenantMember: async () => undefined
+      },
+      apiKeyService: {
+        authenticatePersonalApiKey: async () => {
+          throw new Error("not used");
+        }
+      }
+    });
+
+    const response = await listAppWorkItems(
+      request({
+        "x-api-key": "local-dev-key",
+        "x-traceops-user-key": "github|123456"
+      }),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        caller: { userKey: "github|123456" },
+        activeTenant: { tenantId: "personal~github~123456" },
+        repoId: null,
+        repositoryOptions: [
+          {
+            tenantId: "personal~github~123456",
+            repoId: "AndersMaletzki/TraceOps.Dev",
+            label: "AndersMaletzki/TraceOps.Dev"
+          }
+        ],
+        items: [],
+        count: 0
+      }
     });
   });
 });

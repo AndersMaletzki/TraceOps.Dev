@@ -27,12 +27,43 @@ let cachedService: WorkItemService | undefined;
 let cachedAuthService: AuthService | undefined;
 let cachedApiKeyService: ApiKeyService | undefined;
 
+type WorkItemsModuleOverrides = {
+  config?: TraceOpsConfig;
+  service?: Pick<WorkItemService, "create" | "list" | "get" | "getNext" | "updateStatus" | "claim" | "updateLinks" | "listAppWorkItems">;
+  authService?: Pick<AuthService, "assertTenantMember">;
+  apiKeyService?: Pick<ApiKeyService, "authenticatePersonalApiKey">;
+};
+
+let testOverrides: WorkItemsModuleOverrides | undefined;
+
+export function setWorkItemsModuleTestOverrides(overrides?: WorkItemsModuleOverrides): void {
+  testOverrides = overrides;
+  cachedConfig = overrides?.config;
+  cachedService = overrides?.service as WorkItemService | undefined;
+  cachedAuthService = overrides?.authService as AuthService | undefined;
+  cachedApiKeyService = overrides?.apiKeyService as ApiKeyService | undefined;
+}
+
 function getService(): {
   config: TraceOpsConfig;
   service: WorkItemService;
   authService: AuthService;
   apiKeyService: ApiKeyService;
 } {
+  if (
+    testOverrides?.config &&
+    testOverrides?.service &&
+    testOverrides?.authService &&
+    testOverrides?.apiKeyService
+  ) {
+    return {
+      config: testOverrides.config,
+      service: testOverrides.service as WorkItemService,
+      authService: testOverrides.authService as AuthService,
+      apiKeyService: testOverrides.apiKeyService as ApiKeyService
+    };
+  }
+
   if (!cachedConfig || !cachedService || !cachedAuthService || !cachedApiKeyService) {
     cachedConfig = getConfig();
     cachedAuthService = new AuthService(

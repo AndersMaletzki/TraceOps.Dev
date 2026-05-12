@@ -16,7 +16,30 @@ import { parseCreateApiKeyInput, requiredString } from "../validation.js";
 let cachedConfig: TraceOpsConfig | undefined;
 let cachedService: ApiKeyService | undefined;
 
+type ApiKeysModuleOverrides = {
+  config?: TraceOpsConfig;
+  service?: Pick<
+    ApiKeyService,
+    "createApiKey" | "listApiKeysForUser" | "revokeApiKey" | "resolveTenantIdForUser"
+  >;
+};
+
+let testOverrides: ApiKeysModuleOverrides | undefined;
+
+export function setApiKeysModuleTestOverrides(overrides?: ApiKeysModuleOverrides): void {
+  testOverrides = overrides;
+  cachedConfig = overrides?.config;
+  cachedService = overrides?.service as ApiKeyService | undefined;
+}
+
 function getService(): { config: TraceOpsConfig; service: ApiKeyService } {
+  if (testOverrides?.config && testOverrides?.service) {
+    return {
+      config: testOverrides.config,
+      service: testOverrides.service as ApiKeyService
+    };
+  }
+
   if (!cachedConfig || !cachedService) {
     cachedConfig = getConfig();
     const authService = new AuthService(
@@ -37,10 +60,10 @@ function getService(): { config: TraceOpsConfig; service: ApiKeyService } {
   };
 }
 
-function trustedIdentityFromRequest(request: HttpRequest): { userKey: string; tenantId: string } {
+function trustedIdentityFromRequest(request: HttpRequest): { userKey: string; tenantId?: string } {
   return {
     userKey: requiredString(parseCallerUserKey(request), "x-traceops-user-key"),
-    tenantId: requiredString(parseTrustedTenantId(request), "x-traceops-tenant-id")
+    tenantId: parseTrustedTenantId(request)
   };
 }
 
@@ -69,8 +92,9 @@ export async function createApiKey(
   return handle(request, async (service, identity) => {
     const body = await readJson(request);
     const input = parseCreateApiKeyInput(body);
+    const tenantId = await service.resolveTenantIdForUser(identity.userKey, identity.tenantId);
     const result = await service.createApiKey({
-      tenantId: identity.tenantId,
+      tenantId,
       userKey: identity.userKey,
       ...input
     });
@@ -83,18 +107,20 @@ export async function listApiKeys(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service, identity) =>
-    json(200, { items: await service.listApiKeysForUser(identity.tenantId, identity.userKey) })
-  );
+  return handle(request, async (service, identity) => {
+    const tenantId = await service.resolveTenantIdForUser(identity.userKey, identity.tenantId);
+    return json(200, { items: await service.listApiKeysForUser(tenantId, identity.userKey) });
+  });
 }
 
 export async function revokeApiKey(
   request: HttpRequest,
   _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  return handle(request, async (service, identity) =>
-    json(200, await service.revokeApiKey(identity.tenantId, identity.userKey, request.params.apiKeyId))
-  );
+  return handle(request, async (service, identity) => {
+    const tenantId = await service.resolveTenantIdForUser(identity.userKey, identity.tenantId);
+    return json(200, await service.revokeApiKey(tenantId, identity.userKey, request.params.apiKeyId));
+  });
 }
 
 app.http("createApiKey", {

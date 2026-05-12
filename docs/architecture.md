@@ -105,10 +105,10 @@ Website-consumed backend routes currently owned by the existing Azure Function A
 |---|---|---|---|
 | `/auth/sync-user` | `POST` | `x-api-key` | Sync trusted website identity into TraceOps product records |
 | `/auth/personal-api-key-scopes` | `GET` | `x-api-key` | Read the backend-owned supported personal API key scope list |
-| `/app/workitems` | `GET` | `x-api-key` + caller user header | Read website work items after backend tenant validation |
-| `/me/api-keys` | `POST` | `x-api-key` + caller user header + tenant header | Create a tenant-scoped personal API key |
-| `/me/api-keys` | `GET` | `x-api-key` + caller user header + tenant header | List personal API key metadata |
-| `/me/api-keys/{apiKeyId}` | `DELETE` | `x-api-key` + caller user header + tenant header | Revoke a personal API key |
+| `/app/workitems` | `GET` | `x-api-key` + caller user header | Read website work items after backend tenant validation and active-tenant resolution |
+| `/me/api-keys` | `POST` | `x-api-key` + caller user header | Create a tenant-scoped personal API key using backend-owned tenant resolution |
+| `/me/api-keys` | `GET` | `x-api-key` + caller user header | List personal API key metadata using backend-owned tenant resolution |
+| `/me/api-keys/{apiKeyId}` | `DELETE` | `x-api-key` + caller user header | Revoke a personal API key using backend-owned tenant resolution |
 | `/app/admin/metrics/users` | `GET` | `x-api-key` + caller user header | Read admin-only user metrics |
 | `/app/admin/metrics/issues` | `GET` | `x-api-key` + caller user header | Read admin-only issue metrics |
 | `/app/admin/metrics/requests` | `GET` | `x-api-key` + caller user header | Read admin-only request diagnostics metrics |
@@ -119,7 +119,7 @@ Current website-facing health and diagnostics scope:
 - There is no separate public diagnostics HTTP route beyond `GET /app/admin/metrics/requests`.
 - Operational health still exists through Azure Functions and Application Insights platform telemetry, but that platform surface is not part of the website-facing API contract freeze.
 
-`tenantId` and `repoId` are required for MCP-style repository work item operations so queries stay inside one Table Storage partition. The website-facing `GET /app/workitems` endpoint accepts an optional `repoId`; when omitted, TraceOps.Dev returns work items across accessible tenant repositories and includes `repositoryOptions` from API-owned work item data.
+`tenantId` and `repoId` are required for MCP-style repository work item operations so queries stay inside one Table Storage partition. The website-facing `GET /app/workitems` endpoint accepts optional `tenantId` and `repoId`. When `tenantId` is omitted, TraceOps.Dev resolves the caller's active tenant from backend-owned membership data and returns tenant-scoped `repositoryOptions` from API-owned work item data.
 
 `POST /auth/sync-user` is a trusted backend integration endpoint for the website. The website backend derives the authenticated identity from Azure Static Web Apps auth headers and calls TraceOps with `x-api-key`; browser-provided identity is not trusted. The endpoint creates or updates the user, updates login metadata, stores `isAdmin` when roles contain `admin`, creates a personal tenant when missing, and ensures an owner tenant membership exists.
 
@@ -127,7 +127,7 @@ Current website-facing health and diagnostics scope:
 
 TraceOps.Dev-website is a thin server-side proxy. It sends `x-api-key` and, for app reads, `x-traceops-user-key` derived from trusted auth context. Browser code never receives `TRACEOPS_API_KEY` and never reads or writes product Table Storage directly. Product authorization belongs in TraceOps.Dev API; the website must not duplicate tenant membership validation as the source of truth.
 
-`GET /app/workitems` validates the caller's tenant membership before returning tenant-scoped data. Its response includes `caller`, `activeTenant`, `repoId`, `repositoryOptions`, `items`, and `count`.
+`GET /app/workitems` validates the caller's tenant membership before returning tenant-scoped data. Its response includes `caller`, `activeTenant`, `repoId`, `repositoryOptions`, `items`, and `count`. `activeTenant` is resolved by the API when the trusted caller does not specify `tenantId`, and `repositoryOptions` are scoped to that active tenant.
 
 Current tenant-management scope is intentionally limited to:
 
@@ -157,14 +157,14 @@ Frozen request and response shapes for website-facing routes:
   Query: optional `tenantId`, `repoId`, `status`, `severity`, `workItemType`, `category`, `limit`
   Response body: `caller`, `activeTenant`, `repoId`, `repositoryOptions`, `items`, `count`
 - `POST /me/api-keys`
-  Headers: `x-traceops-user-key`, `x-traceops-tenant-id`
+  Headers: `x-traceops-user-key`; optional `x-traceops-tenant-id`
   Request body: `name`, optional `scopes`, optional `expiresAtUtc`
   Response body: `apiKey`, `metadata`
 - `GET /me/api-keys`
-  Headers: `x-traceops-user-key`, `x-traceops-tenant-id`
+  Headers: `x-traceops-user-key`; optional `x-traceops-tenant-id`
   Response body: `items`
 - `DELETE /me/api-keys/{apiKeyId}`
-  Headers: `x-traceops-user-key`, `x-traceops-tenant-id`
+  Headers: `x-traceops-user-key`; optional `x-traceops-tenant-id`
   Response body: revoked API key metadata without `keyHash`
 - `GET /app/admin/metrics/users`
   Response body: `totalUsers`, `githubUsers`, `microsoftUsers`, `adminUsers`, `usersCreatedLast7Days`, `activeUsersLast30Days`
@@ -175,7 +175,7 @@ Frozen request and response shapes for website-facing routes:
 
 Website and backend integrations must use stable provider identity, represented by `identityProvider` + `providerUserId`. Email may be stored as user detail or display metadata, but integrations must not use email as the primary identity because emails can change and are not guaranteed to be unique across providers.
 
-Browser clients must not be allowed to choose arbitrary tenant access. A trusted backend must derive the caller identity, resolve or verify tenant membership, and pass only authorized `tenantId` values to TraceOps.Dev.
+Browser clients must not be allowed to choose arbitrary tenant access. A trusted backend must derive the caller identity, and TraceOps.Dev must resolve or verify tenant membership before using any `tenantId` for app-facing reads or personal API key management.
 
 Compatibility rules for the migration window:
 

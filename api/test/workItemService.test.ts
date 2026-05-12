@@ -138,15 +138,15 @@ describe("WorkItemService", () => {
     expect(repository.listWorkItems).toHaveBeenCalledWith("tenant", "repo", 250);
   });
 
-  it("returns app work items across accessible tenant repositories when repoId is omitted", async () => {
+  it("resolves a personal active tenant for app work items when tenantId is omitted", async () => {
     const repository = {
       listRepositoryIdsForTenant: vi.fn(async (tenantId: string) =>
-        tenantId === "tenant-a" ? ["repo-a"] : ["repo-b"]
+        tenantId === "personal~github~123456" ? ["repo-a", "repo-b"] : []
       ),
       listWorkItemsForTenant: vi.fn(async (tenantId: string) => [
         createStored({
           tenantId,
-          repoId: tenantId === "tenant-a" ? "repo-a" : "repo-b",
+          repoId: "repo-a",
           workItemId: `ITEM~20260501153000~${tenantId}`
         })
       ]),
@@ -155,13 +155,23 @@ describe("WorkItemService", () => {
     const authService = {
       assertTenantMember: vi.fn(),
       listUserTenants: vi.fn(async () => [
-        { tenantId: "tenant-a", userKey: "github|123456", role: "owner" as const, createdAtUtc: "" },
-        { tenantId: "tenant-b", userKey: "github|123456", role: "member" as const, createdAtUtc: "" }
+        {
+          tenantId: "team-tenant",
+          userKey: "github|123456",
+          role: "member" as const,
+          createdAtUtc: ""
+        },
+        {
+          tenantId: "personal~github~123456",
+          userKey: "github|123456",
+          role: "owner" as const,
+          createdAtUtc: ""
+        }
       ]),
       getTenant: vi.fn(async () => ({
-        tenantId: "tenant-a",
+        tenantId: "personal~github~123456",
         tenantType: "personal" as const,
-        name: "Tenant A",
+        name: "Octo Cat",
         createdByUserKey: "github|123456",
         createdAtUtc: "2026-05-01T15:30:00.000Z"
       }))
@@ -174,13 +184,14 @@ describe("WorkItemService", () => {
     });
 
     expect(result.repoId).toBeNull();
-    expect(result.count).toBe(2);
+    expect(result.activeTenant?.tenantId).toBe("personal~github~123456");
+    expect(result.count).toBe(1);
     expect(result.repositoryOptions).toEqual([
-      { tenantId: "tenant-a", repoId: "repo-a", label: "repo-a" },
-      { tenantId: "tenant-b", repoId: "repo-b", label: "repo-b" }
+      { tenantId: "personal~github~123456", repoId: "repo-a", label: "repo-a" },
+      { tenantId: "personal~github~123456", repoId: "repo-b", label: "repo-b" }
     ]);
-    expect(repository.listWorkItemsForTenant).toHaveBeenCalledWith("tenant-a", 250);
-    expect(repository.listWorkItemsForTenant).toHaveBeenCalledWith("tenant-b", 250);
+    expect(repository.listWorkItemsForTenant).toHaveBeenCalledTimes(1);
+    expect(repository.listWorkItemsForTenant).toHaveBeenCalledWith("personal~github~123456", 250);
   });
 
   it("rejects app work items for an explicit tenant when the caller is not a member", async () => {

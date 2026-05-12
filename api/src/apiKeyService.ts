@@ -13,8 +13,9 @@ import {
   parsePersonalApiKey,
   personalApiKeyHashesMatch
 } from "./apiKey.js";
-import { AuthService } from "./authService.js";
+import { AuthService, chooseActiveTenantId } from "./authService.js";
 import { ApiKeyRepository, toApiKeyMetadata } from "./storage.js";
+import { ValidationError } from "./validation.js";
 
 function isoNow(date = new Date()): string {
   return date.toISOString();
@@ -53,7 +54,7 @@ export class ApiKeyService {
       ApiKeyRepository,
       "createApiKey" | "getApiKey" | "listApiKeysForUser" | "findApiKeysByPrefix" | "upsertApiKey"
     >,
-    private readonly authService: Pick<AuthService, "assertTenantMember">,
+    private readonly authService: Pick<AuthService, "assertTenantMember" | "listUserTenants">,
     private readonly hashSecret: string
   ) {}
 
@@ -110,6 +111,22 @@ export class ApiKeyService {
     });
 
     return toApiKeyMetadata(revoked);
+  }
+
+  async resolveTenantIdForUser(userKey: string, requestedTenantId?: string): Promise<string> {
+    if (requestedTenantId) {
+      await this.authService.assertTenantMember(userKey, requestedTenantId);
+      return requestedTenantId;
+    }
+
+    const memberships = await this.authService.listUserTenants(userKey);
+    const tenantId = chooseActiveTenantId(memberships);
+
+    if (!tenantId) {
+      throw new ValidationError("No accessible tenant found for caller");
+    }
+
+    return tenantId;
   }
 
   async authenticatePersonalApiKey(rawApiKey: string): Promise<PersonalApiKeyAuthContext> {

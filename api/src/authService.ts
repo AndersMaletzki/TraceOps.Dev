@@ -39,6 +39,18 @@ export function getSupportedPersonalApiKeyScopes() {
   return [...apiKeyScopes];
 }
 
+export function chooseActiveTenantId(memberships: Pick<TraceOpsTenantMember, "tenantId">[]): string | undefined {
+  const personalMembership = memberships.find((membership) => membership.tenantId.startsWith("personal~"));
+
+  if (personalMembership) {
+    return personalMembership.tenantId;
+  }
+
+  return [...memberships]
+    .map((membership) => membership.tenantId)
+    .sort((left, right) => left.localeCompare(right))[0];
+}
+
 function displayNameOrUserDetails(input: Pick<SyncUserInput, "displayName" | "userDetails">): string {
   return input.displayName?.trim() || input.userDetails;
 }

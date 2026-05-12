@@ -13,6 +13,7 @@ import {
   WorkItemEvent,
   WorkItemFilters
 } from "./domain.js";
+import { chooseActiveTenantId } from "./authService.js";
 import type { AuthService } from "./authService.js";
 import {
   applyLinks,
@@ -152,14 +153,14 @@ export class WorkItemService {
   }
 
   async listAppWorkItems(filters: AppWorkItemFilters): Promise<AppWorkItemsResult> {
-    const memberships = filters.tenantId
-      ? await this.getValidatedSingleTenantMembership(filters.callerUserKey, filters.tenantId)
-      : await this.listUserTenants(filters.callerUserKey);
-    const tenantIds = memberships.map((membership) => membership.tenantId);
-    const repositoryOptions = await this.listRepositoryOptions(tenantIds);
-    const activeTenantId = filters.tenantId || memberships[0]?.tenantId;
+    const activeTenantId = filters.tenantId
+      ? (await this.getValidatedSingleTenantMembership(filters.callerUserKey, filters.tenantId))[0]?.tenantId
+      : await this.resolveActiveTenantId(filters.callerUserKey);
     const activeTenant = activeTenantId ? await this.getTenant(activeTenantId) : null;
-    const items = await this.listAppWorkItemRows(filters, tenantIds);
+    const repositoryOptions = activeTenantId ? await this.listRepositoryOptions([activeTenantId]) : [];
+    const items = activeTenantId
+      ? await this.listAppWorkItemRows({ ...filters, tenantId: activeTenantId }, [activeTenantId])
+      : [];
 
     return {
       caller: {
@@ -270,6 +271,11 @@ export class WorkItemService {
   private async getValidatedSingleTenantMembership(callerUserKey: string, tenantId: string) {
     await this.assertTenantAccess(callerUserKey, tenantId);
     return [{ tenantId, userKey: callerUserKey, role: "viewer" as const, createdAtUtc: "" }];
+  }
+
+  private async resolveActiveTenantId(callerUserKey: string): Promise<string | undefined> {
+    const memberships = await this.listUserTenants(callerUserKey);
+    return chooseActiveTenantId(memberships);
   }
 
   private async listRepositoryOptions(tenantIds: string[]): Promise<RepositoryOption[]> {
