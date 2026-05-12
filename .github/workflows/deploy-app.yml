@@ -93,31 +93,57 @@ jobs:
           set -euo pipefail
 
           base_url="https://${{ inputs.function_app_name }}.azurewebsites.net"
-          routes=(
-            "/api/app/admin/metrics/users"
-            "/api/app/admin/metrics/issues"
-            "/api/app/admin/metrics/requests"
-            "/api/app/workitems"
-          )
-
-          for route in "${routes[@]}"; do
-            status="000"
+          probe_route() {
+            local route="$1"
+            local expected_csv="$2"
+            shift 2
+            local curl_args=("$@")
+            local response_file
+            response_file="$(mktemp)"
+            local status="000"
 
             for attempt in {1..12}; do
-              status="$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" "${base_url}${route}")"
+              status="$(
+                curl \
+                  --silent \
+                  --show-error \
+                  --output "$response_file" \
+                  --write-out "%{http_code}" \
+                  "${curl_args[@]}" \
+                  "${base_url}${route}"
+              )"
 
-              if [ "$status" != "404" ]; then
-                break
+              IFS=',' read -r -a expected_statuses <<< "$expected_csv"
+
+              for expected_status in "${expected_statuses[@]}"; do
+                if [ "$status" = "$expected_status" ]; then
+                  echo "Route ${route} returned expected HTTP ${status}."
+                  rm -f "$response_file"
+                  return 0
+                fi
+              done
+
+              if [ "$status" = "404" ]; then
+                echo "Route ${route} returned HTTP 404 on attempt ${attempt}; retrying."
+              elif [[ "$status" =~ ^5[0-9][0-9]$ ]]; then
+                echo "Route ${route} returned HTTP ${status} on attempt ${attempt}; retrying."
+              else
+                echo "Route ${route} returned unexpected HTTP ${status} on attempt ${attempt}; retrying."
               fi
 
-              echo "Route ${route} returned HTTP 404 on attempt ${attempt}; retrying."
               sleep 10
             done
 
-            if [ "$status" = "404" ]; then
-              echo "::error::Route ${route} returned HTTP 404 after deployment."
-              exit 1
+            echo "::error::Route ${route} returned HTTP ${status}; expected ${expected_csv}."
+            if [ -s "$response_file" ]; then
+              echo "Response body:"
+              cat "$response_file"
             fi
+            rm -f "$response_file"
+            exit 1
+          }
 
-            echo "Route ${route} returned HTTP ${status}."
-          done
+          probe_route "/api/app/admin/metrics/users" "401"
+          probe_route "/api/app/admin/metrics/issues" "401"
+          probe_route "/api/app/admin/metrics/requests" "401"
+          probe_route "/api/app/workitems" "401"
