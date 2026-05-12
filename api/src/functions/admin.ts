@@ -8,7 +8,27 @@ import { requiredString } from "../validation.js";
 let cachedConfig: TraceOpsConfig | undefined;
 let cachedService: AdminMetricsService | undefined;
 
+type AdminModuleOverrides = {
+  config?: TraceOpsConfig;
+  service?: Pick<AdminMetricsService, "assertAdminUser" | "getUserMetrics" | "getIssueMetrics" | "getRequestMetrics">;
+};
+
+let testOverrides: AdminModuleOverrides | undefined;
+
+export function setAdminModuleTestOverrides(overrides?: AdminModuleOverrides): void {
+  testOverrides = overrides;
+  cachedConfig = overrides?.config;
+  cachedService = overrides?.service as AdminMetricsService | undefined;
+}
+
 function getService(): { config: TraceOpsConfig; service: AdminMetricsService } {
+  if (testOverrides?.config && testOverrides?.service) {
+    return {
+      config: testOverrides.config,
+      service: testOverrides.service as AdminMetricsService
+    };
+  }
+
   if (!cachedConfig || !cachedService) {
     cachedConfig = getConfig();
     cachedService = new AdminMetricsService(

@@ -96,6 +96,28 @@ describe("AdminMetricsService", () => {
     });
   });
 
+  it("counts only Issue work items in issue metrics", async () => {
+    const service = new AdminMetricsService(
+      { getUser: async () => user({ isAdmin: true }), listUsers: async () => [] },
+      {
+        listAllWorkItems: async () => [
+          workItem({ workItemType: "Issue", status: "New" }),
+          workItem({ workItemType: "Feature", status: "Closed" }),
+          workItem({ workItemType: "AuditFinding", status: "Fixed" }),
+          workItem({ workItemType: "Issue", status: "Closed" }, "2026-04-01T12:00:00.000Z")
+        ]
+      }
+    );
+
+    await expect(service.getIssueMetrics(now)).resolves.toEqual({
+      totalIssues: 2,
+      openIssues: 1,
+      fixedIssues: 0,
+      closedIssues: 1,
+      issuesCreatedLast7Days: 1
+    });
+  });
+
   it("aggregates request metrics from Application Insights telemetry", async () => {
     const service = new AdminMetricsService(
       { getUser: async () => user({ isAdmin: true }), listUsers: async () => [] },

@@ -139,7 +139,7 @@ Current tenant-management scope is intentionally limited to:
 
 The current backend does not expose public endpoints for arbitrary tenant creation, tenant updates, tenant deletion, tenant invites, tenant member removal, or tenant role administration beyond the membership data it maintains internally.
 
-Admin metrics endpoints require `x-api-key` and `x-traceops-user-key` for a stored TraceOps user with `isAdmin = true`. Product metrics aggregate from TraceOps-owned storage; request metrics query Application Insights telemetry from Log Analytics with the Function App managed identity.
+Admin metrics endpoints are backend-owned website contracts exposed by the existing Azure Function App. They require `x-api-key` and `x-traceops-user-key` for a stored TraceOps user with `isAdmin = true`. User and issue metrics aggregate from TraceOps-owned storage. Issue metrics count only `workItemType = Issue`. Request metrics query the existing Application Insights data in Log Analytics through the current backend wiring using `TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID` and the Function App managed identity. This contract adds no new telemetry resources, routing, or identities.
 
 - `GET /app/admin/metrics/users`: `totalUsers`, `githubUsers`, `microsoftUsers`, `adminUsers`, `usersCreatedLast7Days`, `activeUsersLast30Days`
 - `GET /app/admin/metrics/issues`: `totalIssues`, `openIssues`, `fixedIssues`, `closedIssues`, `issuesCreatedLast7Days`

@@ -30,9 +30,11 @@ function configWithApiKey(apiKey: string): TraceOpsConfig {
 afterEach(async () => {
   const { setAuthModuleTestOverrides } = await import("../src/functions/auth.js");
   const { setApiKeysModuleTestOverrides } = await import("../src/functions/apiKeys.js");
+  const { setAdminModuleTestOverrides } = await import("../src/functions/admin.js");
   const { setWorkItemsModuleTestOverrides } = await import("../src/functions/workitems.js");
   setAuthModuleTestOverrides(undefined);
   setApiKeysModuleTestOverrides(undefined);
+  setAdminModuleTestOverrides(undefined);
   setWorkItemsModuleTestOverrides(undefined);
 });
 
@@ -410,6 +412,141 @@ describe("website-facing contract freeze", () => {
         ],
         items: [],
         count: 0
+      }
+    });
+  });
+
+  it("exposes the backend-owned admin user metrics contract", async () => {
+    const { getUserMetrics, setAdminModuleTestOverrides } = await import("../src/functions/admin.js");
+
+    setAdminModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        assertAdminUser: async (userKey: string) => {
+          expect(userKey).toBe("github|123456");
+        },
+        getUserMetrics: async () => ({
+          totalUsers: 10,
+          githubUsers: 6,
+          microsoftUsers: 4,
+          adminUsers: 2,
+          usersCreatedLast7Days: 3,
+          activeUsersLast30Days: 8
+        }),
+        getIssueMetrics: async () => {
+          throw new Error("not used");
+        },
+        getRequestMetrics: async () => {
+          throw new Error("not used");
+        }
+      }
+    });
+
+    const response = await getUserMetrics(
+      request({
+        "x-api-key": "local-dev-key",
+        "x-traceops-user-key": "github|123456"
+      }),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        totalUsers: 10,
+        githubUsers: 6,
+        microsoftUsers: 4,
+        adminUsers: 2,
+        usersCreatedLast7Days: 3,
+        activeUsersLast30Days: 8
+      }
+    });
+  });
+
+  it("exposes the backend-owned admin issue metrics contract", async () => {
+    const { getIssueMetrics, setAdminModuleTestOverrides } = await import("../src/functions/admin.js");
+
+    setAdminModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        assertAdminUser: async (userKey: string) => {
+          expect(userKey).toBe("github|123456");
+        },
+        getUserMetrics: async () => {
+          throw new Error("not used");
+        },
+        getIssueMetrics: async () => ({
+          totalIssues: 7,
+          openIssues: 3,
+          fixedIssues: 2,
+          closedIssues: 2,
+          issuesCreatedLast7Days: 1
+        }),
+        getRequestMetrics: async () => {
+          throw new Error("not used");
+        }
+      }
+    });
+
+    const response = await getIssueMetrics(
+      request({
+        "x-api-key": "local-dev-key",
+        "x-traceops-user-key": "github|123456"
+      }),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        totalIssues: 7,
+        openIssues: 3,
+        fixedIssues: 2,
+        closedIssues: 2,
+        issuesCreatedLast7Days: 1
+      }
+    });
+  });
+
+  it("exposes the backend-owned admin request metrics contract", async () => {
+    const { getRequestMetrics, setAdminModuleTestOverrides } = await import("../src/functions/admin.js");
+
+    setAdminModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        assertAdminUser: async (userKey: string) => {
+          expect(userKey).toBe("github|123456");
+        },
+        getUserMetrics: async () => {
+          throw new Error("not used");
+        },
+        getIssueMetrics: async () => {
+          throw new Error("not used");
+        },
+        getRequestMetrics: async () => ({
+          requestsToday: 12,
+          requestsLast7Days: 42,
+          failedRequests: 3,
+          averageResponseDurationMs: 128.5
+        })
+      }
+    });
+
+    const response = await getRequestMetrics(
+      request({
+        "x-api-key": "local-dev-key",
+        "x-traceops-user-key": "github|123456"
+      }),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        requestsToday: 12,
+        requestsLast7Days: 42,
+        failedRequests: 3,
+        averageResponseDurationMs: 128.5
       }
     });
   });

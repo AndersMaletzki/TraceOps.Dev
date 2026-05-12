@@ -132,15 +132,17 @@ export class AdminMetricsService {
   }
 
   async getIssueMetrics(now = new Date()): Promise<IssueMetrics> {
-    const workItems = (await this.workItems.listAllWorkItems(10000)).map(toWorkItem);
+    const issues = (await this.workItems.listAllWorkItems(10000))
+      .map(toWorkItem)
+      .filter((workItem) => workItem.workItemType === "Issue");
     const last7Days = daysAgo(7, now);
 
     return {
-      totalIssues: workItems.length,
-      openIssues: workItems.filter((workItem) => isOpen(workItem)).length,
-      fixedIssues: workItems.filter((workItem) => workItem.status === "Fixed").length,
-      closedIssues: workItems.filter((workItem) => workItem.status === "Closed").length,
-      issuesCreatedLast7Days: workItems.filter((workItem) => isAtOrAfter(workItem.createdAt, last7Days)).length
+      totalIssues: issues.length,
+      openIssues: issues.filter((workItem) => isOpen(workItem)).length,
+      fixedIssues: issues.filter((workItem) => workItem.status === "Fixed").length,
+      closedIssues: issues.filter((workItem) => workItem.status === "Closed").length,
+      issuesCreatedLast7Days: issues.filter((workItem) => isAtOrAfter(workItem.createdAt, last7Days)).length
     };
   }
 

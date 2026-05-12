@@ -69,7 +69,7 @@ function trustedIdentityFromRequest(request: HttpRequest): { userKey: string; te
 
 async function handle(
   request: HttpRequest,
-  operation: (service: ApiKeyService, identity: { userKey: string; tenantId: string }) => Promise<HttpResponseInit>
+  operation: (service: ApiKeyService, identity: { userKey: string; tenantId?: string }) => Promise<HttpResponseInit>
 ): Promise<HttpResponseInit> {
   try {
     const { config, service } = getService();
