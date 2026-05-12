@@ -1,5 +1,7 @@
 import { HttpRequest } from "@azure/functions";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import type { TraceOpsConfig } from "../src/config.js";
+import type { SyncUserResult } from "../src/domain.js";
 
 const localDevKeyHash = "ed5a18fb8f807f996d649e379d3f35f39c543a91bdbf88c492f2ebd10d4df86c";
 
@@ -9,6 +11,25 @@ function request(headers: Record<string, string> = {}, body?: unknown): HttpRequ
     json: async () => body
   } as unknown as HttpRequest;
 }
+
+function configWithApiKey(apiKey: string): TraceOpsConfig {
+  return {
+    apiKey,
+    apiKeyHashSecret: "super-secret",
+    storageConnectionString: "UseDevelopmentStorage=true",
+    workItemsTableName: "WorkItems",
+    workItemEventsTableName: "WorkItemEvents",
+    usersTableName: "TraceOpsUsers",
+    tenantsTableName: "TraceOpsTenants",
+    tenantMembersTableName: "TraceOpsTenantMembers",
+    apiKeysTableName: "TraceOpsApiKeys"
+  };
+}
+
+afterEach(async () => {
+  const { setAuthModuleTestOverrides } = await import("../src/functions/auth.js");
+  setAuthModuleTestOverrides(undefined);
+});
 
 describe("website-facing contract freeze", () => {
   it("requires x-api-key for trusted user sync", async () => {
@@ -31,6 +52,133 @@ describe("website-facing contract freeze", () => {
     );
 
     expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
+  });
+
+  it("preserves legacy sync fields while adding a formal bootstrap contract", async () => {
+    const { setAuthModuleTestOverrides, syncUser } = await import("../src/functions/auth.js");
+    const result: SyncUserResult = {
+      user: {
+        userKey: "github|123456",
+        identityProvider: "github",
+        providerUserId: "123456",
+        userDetails: "octocat@example.com",
+        displayName: "Octo Cat",
+        createdAtUtc: "2026-05-12T00:00:00.000Z",
+        lastLoginAtUtc: "2026-05-12T00:00:00.000Z",
+        loginCount: 1,
+        isAdmin: false
+      },
+      personalTenant: {
+        tenantId: "personal~github~123456",
+        tenantType: "personal",
+        name: "Octo Cat",
+        createdByUserKey: "github|123456",
+        createdAtUtc: "2026-05-12T00:00:00.000Z"
+      },
+      memberships: [
+        {
+          tenantId: "personal~github~123456",
+          userKey: "github|123456",
+          role: "owner",
+          createdAtUtc: "2026-05-12T00:00:00.000Z"
+        }
+      ],
+      bootstrap: {
+        user: {
+          userKey: "github|123456",
+          identityProvider: "github",
+          providerUserId: "123456",
+          userDetails: "octocat@example.com",
+          displayName: "Octo Cat",
+          createdAtUtc: "2026-05-12T00:00:00.000Z",
+          lastLoginAtUtc: "2026-05-12T00:00:00.000Z",
+          loginCount: 1,
+          isAdmin: false
+        },
+        personalTenant: {
+          tenantId: "personal~github~123456",
+          tenantType: "personal",
+          name: "Octo Cat",
+          createdByUserKey: "github|123456",
+          createdAtUtc: "2026-05-12T00:00:00.000Z"
+        },
+        memberships: [
+          {
+            tenantId: "personal~github~123456",
+            userKey: "github|123456",
+            role: "owner",
+            createdAtUtc: "2026-05-12T00:00:00.000Z"
+          }
+        ]
+      }
+    };
+
+    setAuthModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        syncUser: async () => result
+      }
+    });
+
+    const response = await syncUser(
+      request(
+        { "x-api-key": "local-dev-key" },
+        {
+          identityProvider: "github",
+          providerUserId: "123456",
+          userDetails: "octocat@example.com",
+          roles: ["authenticated"]
+        }
+      ),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        user: result.user,
+        personalTenant: result.personalTenant,
+        memberships: result.memberships,
+        bootstrap: {
+          user: result.user,
+          personalTenant: result.personalTenant,
+          memberships: result.memberships
+        }
+      }
+    });
+  });
+
+  it("requires x-api-key for supported personal API key scopes", async () => {
+    process.env.TRACEOPS_API_KEY = localDevKeyHash;
+    process.env.TRACEOPS_API_KEY_HASH_SECRET = "super-secret";
+    process.env.TRACEOPS_STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true";
+    const { getSupportedScopes } = await import("../src/functions/auth.js");
+
+    const response = await getSupportedScopes(request(), {} as never);
+
+    expect(response).toMatchObject({ status: 401, jsonBody: { error: "Unauthorized" } });
+  });
+
+  it("exposes supported personal API key scopes from the backend contract", async () => {
+    const { getSupportedScopes, setAuthModuleTestOverrides } = await import("../src/functions/auth.js");
+
+    setAuthModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service: {
+        syncUser: async () => {
+          throw new Error("not used");
+        }
+      }
+    });
+
+    const response = await getSupportedScopes(request({ "x-api-key": "local-dev-key" }), {} as never);
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        supportedPersonalApiKeyScopes: ["workitems:read", "workitems:create", "workitems:update"]
+      }
+    });
   });
 
   it("requires trusted caller headers to create personal API keys", async () => {

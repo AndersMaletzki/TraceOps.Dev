@@ -1,4 +1,5 @@
 import {
+  apiKeyScopes,
   SyncUserInput,
   SyncUserResult,
   TraceOpsTenant,
@@ -32,6 +33,10 @@ export function buildPersonalTenantId(
   input: Pick<SyncUserInput, "identityProvider" | "providerUserId">
 ): string {
   return `personal~${input.identityProvider}~${input.providerUserId}`;
+}
+
+export function getSupportedPersonalApiKeyScopes() {
+  return [...apiKeyScopes];
 }
 
 function displayNameOrUserDetails(input: Pick<SyncUserInput, "displayName" | "userDetails">): string {
@@ -83,10 +88,15 @@ export class AuthService {
       memberships.push(ownerMembership);
     }
 
-    return {
+    const bootstrap = {
       user,
       personalTenant,
       memberships
+    };
+
+    return {
+      ...bootstrap,
+      bootstrap
     };
   }
 

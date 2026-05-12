@@ -88,6 +88,7 @@ PATCH /workitems/{workItemId}/status
 PATCH /workitems/{workItemId}/claim
 PATCH /workitems/{workItemId}/links
 POST  /auth/sync-user
+GET   /auth/personal-api-key-scopes
 GET   /app/workitems
 GET   /app/admin/metrics/users
 GET   /app/admin/metrics/issues
@@ -103,6 +104,7 @@ Website-consumed backend routes currently owned by the existing Azure Function A
 | Route | Method | Trusted auth | Purpose |
 |---|---|---|---|
 | `/auth/sync-user` | `POST` | `x-api-key` | Sync trusted website identity into TraceOps product records |
+| `/auth/personal-api-key-scopes` | `GET` | `x-api-key` | Read the backend-owned supported personal API key scope list |
 | `/app/workitems` | `GET` | `x-api-key` + caller user header | Read website work items after backend tenant validation |
 | `/me/api-keys` | `POST` | `x-api-key` + caller user header + tenant header | Create a tenant-scoped personal API key |
 | `/me/api-keys` | `GET` | `x-api-key` + caller user header + tenant header | List personal API key metadata |
@@ -120,6 +122,8 @@ Current website-facing health and diagnostics scope:
 `tenantId` and `repoId` are required for MCP-style repository work item operations so queries stay inside one Table Storage partition. The website-facing `GET /app/workitems` endpoint accepts an optional `repoId`; when omitted, TraceOps.Dev returns work items across accessible tenant repositories and includes `repositoryOptions` from API-owned work item data.
 
 `POST /auth/sync-user` is a trusted backend integration endpoint for the website. The website backend derives the authenticated identity from Azure Static Web Apps auth headers and calls TraceOps with `x-api-key`; browser-provided identity is not trusted. The endpoint creates or updates the user, updates login metadata, stores `isAdmin` when roles contain `admin`, creates a personal tenant when missing, and ensures an owner tenant membership exists.
+
+`GET /auth/personal-api-key-scopes` is a trusted backend integration endpoint for the website. The response is owned by TraceOps.Dev API and is the source of truth for which personal API key scopes are currently supported.
 
 TraceOps.Dev-website is a thin server-side proxy. It sends `x-api-key` and, for app reads, `x-traceops-user-key` derived from trusted auth context. Browser code never receives `TRACEOPS_API_KEY` and never reads or writes product Table Storage directly. Product authorization belongs in TraceOps.Dev API; the website must not duplicate tenant membership validation as the source of truth.
 
@@ -145,7 +149,9 @@ Frozen request and response shapes for website-facing routes:
 
 - `POST /auth/sync-user`
   Request body: `identityProvider`, `providerUserId`, `userDetails`, optional `displayName`, required `roles`
-  Response body: `user`, `personalTenant`, `memberships`
+  Response body: legacy top-level `user`, `personalTenant`, `memberships`, plus additive `bootstrap` with the same shape
+- `GET /auth/personal-api-key-scopes`
+  Response body: `supportedPersonalApiKeyScopes`
 - `GET /app/workitems`
   Headers: canonical `x-traceops-user-key`; legacy `x-user-key` remains temporarily accepted for backward compatibility
   Query: optional `tenantId`, `repoId`, `status`, `severity`, `workItemType`, `category`, `limit`

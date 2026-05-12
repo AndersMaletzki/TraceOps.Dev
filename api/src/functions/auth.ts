@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { AuthService } from "../authService.js";
+import { AuthService, getSupportedPersonalApiKeyScopes } from "../authService.js";
 import { getConfig, TraceOpsConfig } from "../config.js";
 import { authenticateTrustedRequest, errorResponse, json, readJson } from "../http.js";
 import { TenantMemberRepository, TenantRepository, UserRepository } from "../storage.js";
@@ -8,7 +8,27 @@ import { parseSyncUserInput } from "../validation.js";
 let cachedConfig: TraceOpsConfig | undefined;
 let cachedService: AuthService | undefined;
 
+type AuthModuleOverrides = {
+  config?: TraceOpsConfig;
+  service?: Pick<AuthService, "syncUser">;
+};
+
+let testOverrides: AuthModuleOverrides | undefined;
+
+export function setAuthModuleTestOverrides(overrides?: AuthModuleOverrides): void {
+  testOverrides = overrides;
+  cachedConfig = overrides?.config;
+  cachedService = overrides?.service as AuthService | undefined;
+}
+
 function getService(): { config: TraceOpsConfig; service: AuthService } {
+  if (testOverrides?.config && testOverrides?.service) {
+    return {
+      config: testOverrides.config,
+      service: testOverrides.service as AuthService
+    };
+  }
+
   if (!cachedConfig || !cachedService) {
     cachedConfig = getConfig();
     cachedService = new AuthService(
@@ -53,9 +73,27 @@ export async function syncUser(
   });
 }
 
+export async function getSupportedScopes(
+  request: HttpRequest,
+  _context: InvocationContext
+): Promise<HttpResponseInit> {
+  return handle(request, async () =>
+    json(200, {
+      supportedPersonalApiKeyScopes: getSupportedPersonalApiKeyScopes()
+    })
+  );
+}
+
 app.http("syncUser", {
   methods: ["POST"],
   authLevel: "anonymous",
   route: "auth/sync-user",
   handler: syncUser
+});
+
+app.http("getSupportedScopes", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "auth/personal-api-key-scopes",
+  handler: getSupportedScopes
 });

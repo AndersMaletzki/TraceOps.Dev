@@ -107,7 +107,12 @@ describe("AuthService", () => {
         role: "owner"
       })
     ]);
-    expect(Object.keys(result).sort()).toEqual(["memberships", "personalTenant", "user"]);
+    expect(result.bootstrap).toEqual({
+      user: result.user,
+      personalTenant: result.personalTenant,
+      memberships: result.memberships
+    });
+    expect(Object.keys(result).sort()).toEqual(["bootstrap", "memberships", "personalTenant", "user"]);
   });
 
   it("updates login metadata and admin state on every sync without recreating the tenant", async () => {

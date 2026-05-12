@@ -118,10 +118,18 @@ export type SyncUserInput = {
   roles: string[];
 };
 
-export type SyncUserResult = {
+export type UserBootstrap = {
   user: TraceOpsUser;
   personalTenant: TraceOpsTenant;
   memberships: TraceOpsTenantMember[];
+};
+
+export type SyncUserResult = UserBootstrap & {
+  bootstrap: UserBootstrap;
+};
+
+export type SupportedPersonalApiKeyScopesResult = {
+  supportedPersonalApiKeyScopes: ApiKeyScope[];
 };
 
 export type WorkItem = {
