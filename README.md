@@ -237,11 +237,38 @@ The raw personal API key is returned only once at creation time. The stored enti
 
 TraceOps.Dev-website is a thin server-side proxy for product data. It calls TraceOps.Dev API with `TRACEOPS_API_BASE_URL` and the raw `TRACEOPS_API_KEY`; browser code must never receive that key and must never read or write TraceOps product tables directly. The TraceOps.Dev API is the sole owner of backend routes, users, tenants, tenant memberships, work items, work item events, admin endpoints, API key handling, tenant validation, diagnostics/metrics, and storage access for product data.
 
+PR 5 freezes the current website-facing backend contract before migration. This freeze is intentionally non-behavioral: no route moves, no route rewrites, no Azure changes, and no website repo changes are included here.
+
+Frozen website-consumed route inventory:
+
+| Backend route | Method | Notes |
+|---|---|---|
+| `/api/auth/sync-user` | `POST` | Trusted backend user bootstrap and sync |
+| `/api/app/workitems` | `GET` | Website work item listing with backend tenant validation |
+| `/api/me/api-keys` | `POST` | Create personal API key |
+| `/api/me/api-keys` | `GET` | List personal API key metadata |
+| `/api/me/api-keys/{apiKeyId}` | `DELETE` | Revoke personal API key |
+| `/api/app/admin/metrics/users` | `GET` | Admin-only user metrics |
+| `/api/app/admin/metrics/issues` | `GET` | Admin-only issue metrics |
+| `/api/app/admin/metrics/requests` | `GET` | Admin-only request diagnostics metrics |
+
+Frozen health and diagnostics scope:
+
+- There is no dedicated public `/api/health` route in the current website-facing contract.
+- There is no separate public diagnostics route beyond `/api/app/admin/metrics/requests`.
+- Azure Functions health and Application Insights telemetry remain operational dependencies, but they are platform diagnostics rather than website-facing API routes.
+
 All website proxy calls require:
 
 - `x-api-key: <raw TraceOps API key>`
 - `x-traceops-user-key: <identityProvider>|<providerUserId>` for user-scoped app reads
 - `x-traceops-tenant-id: <tenantId>` for personal API key management
+
+Temporary backward-compatibility window:
+
+- `x-traceops-user-key` is the canonical caller identity header.
+- The backend still accepts legacy `x-user-key` for the migration window so the current website flow can remain stable during cutover.
+- That legacy alias should be removed only in an explicit follow-up change after migration completes.
 
 `POST /api/auth/sync-user` accepts only trusted backend identity fields:
 
@@ -287,6 +314,13 @@ Response shape:
   "count": 0
 }
 ```
+
+Frozen compatibility rules:
+
+- Existing routes and HTTP methods listed above are part of the migration baseline and should not change in this window.
+- Existing documented request fields keep their current meaning and validation behavior.
+- Additive response fields are allowed if current documented fields remain present with the same type and semantics.
+- This contract freeze does not change backend authorization boundaries, routing ownership, or storage ownership.
 
 Admin metrics endpoints require `x-api-key`:
 

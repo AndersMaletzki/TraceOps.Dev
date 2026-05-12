@@ -143,6 +143,12 @@ describe("caller user parsing", () => {
     expect(parseCallerUserKey(request)).toBe("github|123456");
   });
 
+  it("accepts the legacy x-user-key header during the compatibility window", () => {
+    const request = requestWithQueryAndHeaders({}, { "x-user-key": "github|123456" });
+
+    expect(parseCallerUserKey(request)).toBe("github|123456");
+  });
+
   it("does not trust caller user keys from query parameters", () => {
     const request = requestWithQueryAndHeaders({ callerUserKey: "github|123456" });
 
