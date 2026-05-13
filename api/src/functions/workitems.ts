@@ -7,6 +7,7 @@ import {
   authenticate,
   assertApiKeyScope,
   assertAuthorizedTenant,
+  assertTenantScopedWorkItemAuth,
   callerUserKeyFromAuth,
   errorResponse,
   json,
@@ -117,6 +118,7 @@ export async function createWorkItem(
     const body = await readJson(request);
     const input = parseCreateWorkItemInput(body);
 
+    assertTenantScopedWorkItemAuth(auth);
     assertApiKeyScope(auth, "workitems:create");
     assertAuthorizedTenant(auth, input.tenantId);
 
@@ -137,6 +139,7 @@ export async function listWorkItems(
     const filters = parseFiltersFromQuery(request);
     filters.callerUserKey = callerUserKeyFromAuth(request, auth);
 
+    assertTenantScopedWorkItemAuth(auth);
     assertApiKeyScope(auth, "workitems:read");
     assertAuthorizedTenant(auth, filters.tenantId);
 
@@ -155,6 +158,7 @@ export async function getWorkItem(
     const repoId = request.query.get("repoId");
     const body = parseTenantRepoBody({ tenantId, repoId });
 
+    assertTenantScopedWorkItemAuth(auth);
     assertApiKeyScope(auth, "workitems:read");
     assertAuthorizedTenant(auth, body.tenantId);
 
@@ -176,6 +180,7 @@ export async function getNextWorkItem(
     const filters = parseFiltersFromQuery(request);
     filters.callerUserKey = callerUserKeyFromAuth(request, auth);
 
+    assertTenantScopedWorkItemAuth(auth);
     assertApiKeyScope(auth, "workitems:read");
     assertAuthorizedTenant(auth, filters.tenantId);
 
@@ -192,6 +197,7 @@ export async function updateWorkItemStatus(
     const body = await readJson(request);
     const input = parseUpdateStatusBody(body);
 
+    assertTenantScopedWorkItemAuth(auth);
     assertApiKeyScope(auth, "workitems:update");
     assertAuthorizedTenant(auth, input.tenantId);
 
@@ -212,6 +218,7 @@ export async function claimWorkItem(
     const body = await readJson(request);
     const input = parseClaimBody(body);
 
+    assertTenantScopedWorkItemAuth(auth);
     assertApiKeyScope(auth, "workitems:update");
     assertAuthorizedTenant(auth, input.tenantId);
 
@@ -232,6 +239,7 @@ export async function updateWorkItemLinks(
     const body = await readJson(request);
     const input = parseLinksBody(body);
 
+    assertTenantScopedWorkItemAuth(auth);
     assertApiKeyScope(auth, "workitems:update");
     assertAuthorizedTenant(auth, input.tenantId);
 

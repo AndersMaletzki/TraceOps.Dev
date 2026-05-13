@@ -113,4 +113,23 @@ describe("TraceOpsApiClient", () => {
     });
     expect((init?.headers as Record<string, string>)["x-api-key"]).toBeUndefined();
   });
+
+  it("flags tenant-scoped access as unsupported when configured with a raw global API key", () => {
+    const client = new TraceOpsApiClient("http://localhost:7071/api", testRawApiKey);
+
+    expect(client.authMode).toBe("global");
+    expect(client.supportsTenantScopedWorkItemAccess()).toBe(false);
+    expect(client.tenantScopedWorkItemAccessError()).toEqual({
+      code: "personal_api_key_required",
+      message:
+        "Tenant-scoped MCP work item tools require TRACEOPS_API_KEY to be a personal API key. Raw global x-api-key access is reserved for backend-owned website routes."
+    });
+  });
+
+  it("flags tenant-scoped access as supported when configured with a personal API key", () => {
+    const client = new TraceOpsApiClient("http://localhost:7071/api", testPersonalApiKey);
+
+    expect(client.authMode).toBe("personal");
+    expect(client.supportsTenantScopedWorkItemAccess()).toBe(true);
+  });
 });

@@ -131,6 +131,21 @@ export function callerUserKeyFromAuth(request: HttpRequest, auth: AuthContext): 
   return auth.kind === "personal" ? auth.userKey : parseCallerUserKey(request);
 }
 
+export class UnsupportedTenantScopedAuthError extends Error {
+  constructor() {
+    super(
+      "Tenant-scoped work item routes require Authorization: Bearer <personal-api-key>. Raw x-api-key access is only supported for backend-owned website routes."
+    );
+    this.name = "UnsupportedTenantScopedAuthError";
+  }
+}
+
+export function assertTenantScopedWorkItemAuth(auth: AuthContext): void {
+  if (auth.kind !== "personal") {
+    throw new UnsupportedTenantScopedAuthError();
+  }
+}
+
 export function assertAuthorizedTenant(auth: AuthContext, tenantId: string): void {
   if (auth.kind === "personal" && auth.tenantId !== tenantId) {
     throw new TenantAccessDeniedError(tenantId);
@@ -241,6 +256,10 @@ export function errorResponse(error: unknown): HttpResponseInit {
   }
 
   if (error instanceof ApiKeyScopeDeniedError) {
+    return json(403, { error: error.message });
+  }
+
+  if (error instanceof UnsupportedTenantScopedAuthError) {
     return json(403, { error: error.message });
   }
 

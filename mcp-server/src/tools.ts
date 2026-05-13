@@ -55,6 +55,16 @@ function result(data: unknown) {
   };
 }
 
+function tenantScopedAuthGuardrail(client: TraceOpsApiClient) {
+  if (client.supportsTenantScopedWorkItemAccess()) {
+    return undefined;
+  }
+
+  return result({
+    error: client.tenantScopedWorkItemAccessError()
+  });
+}
+
 function withResolvedTenant<T extends { tenantId?: string }>(
   input: T,
   context: TraceOpsMcpContext
@@ -92,7 +102,9 @@ export function registerTraceOpsTools(
       result({
         tenantId: context.defaultTenantId ?? null,
         repoId: null,
-        hasDefaultTenant: Boolean(context.defaultTenantId)
+        hasDefaultTenant: Boolean(context.defaultTenantId),
+        authMode: client.authMode,
+        tenantScopedWorkItemAccess: client.supportsTenantScopedWorkItemAccess()
       })
   );
 
@@ -119,6 +131,11 @@ export function registerTraceOpsTools(
       externalPrUrl: z.string().optional()
     },
     async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
       const resolved = withResolvedTenant(input, context);
       if (!resolved.ok) {
         return result(resolved.error);
@@ -133,6 +150,11 @@ export function registerTraceOpsTools(
     "Search TraceOps work items in a tenant/repository partition.",
     filterSchema,
     async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
       const resolved = withResolvedTenant(input, context);
       if (!resolved.ok) {
         return result(resolved.error);
@@ -154,6 +176,11 @@ export function registerTraceOpsTools(
       workItemId: z.string().min(1)
     },
     async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
       const resolved = withResolvedTenant(input, context);
       if (!resolved.ok) {
         return result(resolved.error);
@@ -168,6 +195,11 @@ export function registerTraceOpsTools(
     "Get the next actionable TraceOps work item.",
     filterSchema,
     async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
       const resolved = withResolvedTenant(input, context);
       if (!resolved.ok) {
         return result(resolved.error);
@@ -187,6 +219,11 @@ export function registerTraceOpsTools(
       actor: z.string().min(1)
     },
     async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
       const resolved = withResolvedTenant(input, context);
       if (!resolved.ok) {
         return result(resolved.error);
@@ -206,6 +243,11 @@ export function registerTraceOpsTools(
       claimDurationMinutes: z.number().int().min(1).optional()
     },
     async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
       const resolved = withResolvedTenant(input, context);
       if (!resolved.ok) {
         return result(resolved.error);
@@ -226,6 +268,11 @@ export function registerTraceOpsTools(
       externalPrUrl: z.string().optional()
     },
     async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
       const resolved = withResolvedTenant(input, context);
       if (!resolved.ok) {
         return result(resolved.error);

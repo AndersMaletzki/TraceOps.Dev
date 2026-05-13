@@ -25,6 +25,7 @@ export class TraceOpsApiError extends Error {
 export class TraceOpsApiClient {
   private readonly baseUrl: URL;
   private readonly authHeaders: Record<string, string>;
+  readonly authMode: "global" | "personal";
 
   constructor(
     apiBaseUrl: string,
@@ -32,6 +33,7 @@ export class TraceOpsApiClient {
     private readonly fetchFn: FetchFunction = fetch
   ) {
     this.baseUrl = new URL(apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`);
+    this.authMode = this.apiKey.startsWith("trc_") ? "personal" : "global";
     this.authHeaders = this.buildAuthHeaders(apiKey);
   }
 
@@ -118,6 +120,18 @@ export class TraceOpsApiClient {
         externalPrUrl: input.externalPrUrl
       }
     });
+  }
+
+  supportsTenantScopedWorkItemAccess(): boolean {
+    return this.authMode === "personal";
+  }
+
+  tenantScopedWorkItemAccessError(): { code: string; message: string } {
+    return {
+      code: "personal_api_key_required",
+      message:
+        "Tenant-scoped MCP work item tools require TRACEOPS_API_KEY to be a personal API key. Raw global x-api-key access is reserved for backend-owned website routes."
+    };
   }
 
   private toQuery(input: Record<string, string | number | undefined>): string {

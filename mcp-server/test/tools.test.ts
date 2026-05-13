@@ -63,6 +63,13 @@ function testWorkItem(overrides: Partial<WorkItem> = {}): WorkItem {
 
 function createClient() {
   return {
+    authMode: "personal" as const,
+    supportsTenantScopedWorkItemAccess: vi.fn(() => true),
+    tenantScopedWorkItemAccessError: vi.fn(() => ({
+      code: "personal_api_key_required",
+      message:
+        "Tenant-scoped MCP work item tools require TRACEOPS_API_KEY to be a personal API key. Raw global x-api-key access is reserved for backend-owned website routes."
+    })),
     createWorkItem: vi.fn(async () => testWorkItem()),
     searchWorkItems: vi.fn(async () => ({ items: [testWorkItem()], count: 1 })),
     getWorkItem: vi.fn(async () => testWorkItem()),
@@ -154,7 +161,9 @@ describe("registerTraceOpsTools", () => {
     await expect(parseResponse(await handlers.get_context({}))).toEqual({
       tenantId: "anders",
       repoId: null,
-      hasDefaultTenant: true
+      hasDefaultTenant: true,
+      authMode: "personal",
+      tenantScopedWorkItemAccess: true
     });
   });
 
@@ -165,8 +174,33 @@ describe("registerTraceOpsTools", () => {
     await expect(parseResponse(await handlers.get_context({}))).toEqual({
       tenantId: null,
       repoId: null,
-      hasDefaultTenant: false
+      hasDefaultTenant: false,
+      authMode: "personal",
+      tenantScopedWorkItemAccess: true
     });
+  });
+
+  it("returns MCP auth guardrails instead of calling the API with a raw global key", async () => {
+    for (const toolCase of toolCases) {
+      const { server, handlers } = createServer();
+      const client = createClient();
+      client.authMode = "global";
+      client.supportsTenantScopedWorkItemAccess.mockReturnValue(false);
+      registerTraceOpsTools(server, client as unknown as TraceOpsApiClient, {
+        defaultTenantId: "anders"
+      });
+
+      const response = parseResponse(await handlers[toolCase.name](toolCase.input));
+
+      expect(response).toEqual({
+        error: {
+          code: "personal_api_key_required",
+          message:
+            "Tenant-scoped MCP work item tools require TRACEOPS_API_KEY to be a personal API key. Raw global x-api-key access is reserved for backend-owned website routes."
+        }
+      });
+      expect(client[toolCase.method]).not.toHaveBeenCalled();
+    }
   });
 
   it("passes explicit tenantId through instead of the configured default", async () => {

@@ -86,15 +86,12 @@ MCP server:
 
 ```bash
 export TRACEOPS_API_BASE_URL='http://localhost:7071/api'
-export TRACEOPS_API_KEY='local-dev-key'
+export TRACEOPS_API_KEY='trc_live_<prefix>_<secret>'
 ```
 
-`TRACEOPS_API_KEY` in the MCP server accepts either:
+`TRACEOPS_API_KEY` in the MCP server must be a personal API key like `trc_live_...`, which the MCP sends as `Authorization: Bearer ...` for tenant-scoped work item tools. Raw trusted `x-api-key` authentication remains reserved for backend-owned website and admin routes.
 
-- the raw trusted internal API key, which the MCP sends as `x-api-key`
-- a personal API key like `trc_live_...`, which the MCP sends as `Authorization: Bearer ...`
-
-For the API, `TRACEOPS_API_KEY` is the lowercase SHA-256 hash of the raw trusted internal API key. HTTP clients such as the website backend and MCP server authenticate by sending the raw key in `x-api-key`; the API hashes that incoming value before comparing. The local API hash above is the SHA-256 hash of `local-dev-key`.
+For the API, `TRACEOPS_API_KEY` is the lowercase SHA-256 hash of the raw trusted internal API key. Trusted backend callers such as the website authenticate by sending the raw key in `x-api-key`; the API hashes that incoming value before comparing. The local API hash above is the SHA-256 hash of `local-dev-key`.
 
 `TRACEOPS_API_KEY_HASH_SECRET` is separate. It is a high-entropy secret used only for HMAC-SHA256 hashing of personal API keys before they are stored in Table Storage. Personal API keys are never stored in raw form.
 
@@ -121,7 +118,7 @@ Create an audit finding:
 ```bash
 curl -sS -X POST 'http://localhost:7071/api/workitems' \
   -H 'content-type: application/json' \
-  -H 'x-api-key: local-dev-key' \
+  -H 'Authorization: Bearer <personal-api-key>' \
   --data @scripts/examples/create-security-issue.json
 ```
 
@@ -129,14 +126,14 @@ Search work items:
 
 ```bash
 curl -sS 'http://localhost:7071/api/workitems?tenantId=demo-tenant&repoId=traceops-dev&limit=10' \
-  -H 'x-api-key: local-dev-key'
+  -H 'Authorization: Bearer <personal-api-key>'
 ```
 
 Get the next actionable item:
 
 ```bash
 curl -sS 'http://localhost:7071/api/workitems/next?tenantId=demo-tenant&repoId=traceops-dev' \
-  -H 'x-api-key: local-dev-key'
+  -H 'Authorization: Bearer <personal-api-key>'
 ```
 
 Claim an item:
@@ -144,7 +141,7 @@ Claim an item:
 ```bash
 curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/claim' \
   -H 'content-type: application/json' \
-  -H 'x-api-key: local-dev-key' \
+  -H 'Authorization: Bearer <personal-api-key>' \
   --data @scripts/examples/claim-workitem.json
 ```
 
@@ -153,7 +150,7 @@ Update status:
 ```bash
 curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/status' \
   -H 'content-type: application/json' \
-  -H 'x-api-key: local-dev-key' \
+  -H 'Authorization: Bearer <personal-api-key>' \
   --data '{"tenantId":"demo-tenant","repoId":"traceops-dev","status":"InProgress","actor":"codex"}'
 ```
 
@@ -162,7 +159,7 @@ Store external metadata:
 ```bash
 curl -sS -X PATCH 'http://localhost:7071/api/workitems/ITEM~20260501153000~abc123def0/links' \
   -H 'content-type: application/json' \
-  -H 'x-api-key: local-dev-key' \
+  -H 'Authorization: Bearer <personal-api-key>' \
   --data @scripts/examples/update-links.json
 ```
 

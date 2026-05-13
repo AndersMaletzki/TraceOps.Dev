@@ -77,7 +77,7 @@ TraceOps.Dev v0.1 does not support:
 
 ## API
 
-Trusted internal endpoints use `x-api-key`. `TRACEOPS_API_KEY` stores the lowercase SHA-256 hash of the raw trusted key, and the API hashes the incoming `x-api-key` value before comparing. Tenant-scoped work item endpoints also accept `Authorization: Bearer <personal-api-key>` for personal API keys.
+Trusted backend-owned endpoints use `x-api-key`. `TRACEOPS_API_KEY` stores the lowercase SHA-256 hash of the raw trusted key, and the API hashes the incoming `x-api-key` value before comparing. Tenant-scoped work item endpoints require `Authorization: Bearer <personal-api-key>` so tenant access stays bound to backend-owned personal API key records rather than a raw global key.
 
 ```text
 POST  /workitems
