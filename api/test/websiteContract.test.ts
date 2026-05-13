@@ -23,7 +23,9 @@ function configWithApiKey(apiKey: string): TraceOpsConfig {
     usersTableName: "TraceOpsUsers",
     tenantsTableName: "TraceOpsTenants",
     tenantMembersTableName: "TraceOpsTenantMembers",
-    apiKeysTableName: "TraceOpsApiKeys"
+    apiKeysTableName: "TraceOpsApiKeys",
+    enableOptimizedWorkItemLookupWrites: false,
+    preferOptimizedWorkItemLookups: false
   };
 }
 

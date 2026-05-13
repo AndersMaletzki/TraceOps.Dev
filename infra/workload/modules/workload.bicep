@@ -237,6 +237,14 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
           value: apiKeysTableName
         }
         {
+          name: 'TRACEOPS_ENABLE_OPTIMIZED_WORKITEM_LOOKUP_WRITES'
+          value: 'true'
+        }
+        {
+          name: 'TRACEOPS_PREFER_OPTIMIZED_WORKITEM_LOOKUPS'
+          value: 'false'
+        }
+        {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsights.properties.ConnectionString
         }

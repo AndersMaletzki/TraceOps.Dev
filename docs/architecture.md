@@ -246,6 +246,17 @@ RowKey       = EVT~<yyyyMMddHHmmss>~<shortId>
 
 `files` and `tags` are arrays in API and MCP payloads. They are stored as JSON strings in Table Storage.
 
+Optimized lookup rollout settings:
+
+- `TRACEOPS_ENABLE_OPTIMIZED_WORKITEM_LOOKUP_WRITES` controls additive dual writes for tenant lookup entities in the existing `WorkItems` table.
+- `TRACEOPS_PREFER_OPTIMIZED_WORKITEM_LOOKUPS` controls whether tenant-wide app listing and tenant repository discovery prefer the optimized lookup path.
+- Deployment default: `TRACEOPS_ENABLE_OPTIMIZED_WORKITEM_LOOKUP_WRITES=true`
+- Deployment default: `TRACEOPS_PREFER_OPTIMIZED_WORKITEM_LOOKUPS=false`
+- Enabling optimized writes is safe because it is additive only and preserves the existing primary work item rows and current read contracts.
+- Optimized reads are not production-safe yet because old work items without lookup entities are not visible through the optimized tenant-wide lookup path.
+- Optimized reads must remain disabled until either fallback reads exist or a verified backfill strategy exists.
+- This allows gradual organic backfill from normal work item writes without changing routing, auth, or consumer-visible API contracts.
+
 ## Work Item Contract
 
 Work item fields:

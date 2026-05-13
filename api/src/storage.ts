@@ -21,6 +21,24 @@ type StoredWorkItem = Omit<WorkItem, "files" | "tags"> & {
   tags: string;
 };
 
+type StoredTenantRepoLookup = {
+  partitionKey: string;
+  rowKey: string;
+  entityType: "TenantRepoLookup";
+  repoId: string;
+  repoLabel: string;
+  updatedAt: string;
+};
+
+type StoredTenantWorkItemLookup = Omit<WorkItem, "tenantId" | "files" | "tags"> & {
+  partitionKey: string;
+  rowKey: string;
+  entityType: "TenantWorkItemLookup";
+  repoId: string;
+  files: string;
+  tags: string;
+};
+
 type StoredWorkItemEvent = WorkItemEvent & {
   partitionKey: string;
   rowKey: string;
@@ -122,6 +140,35 @@ export type StoredWorkItemResult = Partial<StoredWorkItem> &
   etag?: string;
 };
 
+type StoredTenantRepoLookupResult = Partial<StoredTenantRepoLookup> &
+  Pick<StoredTenantRepoLookup, "partitionKey" | "rowKey" | "entityType" | "repoId" | "repoLabel" | "updatedAt"> & {
+    etag?: string;
+  };
+
+type StoredTenantWorkItemLookupResult = Partial<StoredTenantWorkItemLookup> &
+  Pick<
+    StoredTenantWorkItemLookup,
+    | "partitionKey"
+    | "rowKey"
+    | "entityType"
+    | "repoId"
+    | "workItemId"
+    | "workItemType"
+    | "category"
+    | "title"
+    | "description"
+    | "severity"
+    | "status"
+    | "source"
+    | "files"
+    | "tags"
+    | "createdAt"
+    | "updatedAt"
+    | "createdBy"
+  > & {
+    etag?: string;
+  };
+
 function safeParseStringArray(value: string | undefined): string[] {
   if (!value) {
     return [];
@@ -133,6 +180,37 @@ function safeParseStringArray(value: string | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+function tableKeySegment(value: string): string {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+function reverseSortableTimestamp(value: string): string {
+  const sortable = value.replace(/\D/g, "").slice(0, 14);
+  const numeric = Number.parseInt(sortable, 10);
+
+  if (!Number.isFinite(numeric)) {
+    return "99999999999999";
+  }
+
+  return String(99_999_999_999_999 - numeric).padStart(14, "0");
+}
+
+function tenantLookupPartitionKey(tenantId: string): string {
+  return `TENANT_LOOKUP~${tableKeySegment(tenantId)}`;
+}
+
+function tenantRepoLookupRowKey(repoId: string): string {
+  return `REPO~${tableKeySegment(repoId)}`;
+}
+
+function tenantWorkItemLookupRowKey(createdAt: string, repoId: string, workItemId: string): string {
+  return `ITEM~${reverseSortableTimestamp(createdAt)}~REPO~${tableKeySegment(repoId)}~${workItemId}`;
+}
+
+function isPrimaryWorkItemEntity(entity: Pick<StoredWorkItemResult, "partitionKey" | "rowKey">): boolean {
+  return entity.partitionKey.includes("~REPO~") && entity.rowKey.startsWith("ITEM~");
 }
 
 export function toWorkItem(entity: StoredWorkItemResult): WorkItem {
@@ -200,6 +278,80 @@ export function toStoredEvent(event: WorkItemEvent): StoredWorkItemEvent {
     partitionKey: partitionKey(event.tenantId, event.repoId),
     rowKey: event.eventId,
     ...event
+  };
+}
+
+export function toStoredTenantRepoLookup(entity: StoredWorkItemResult): StoredTenantRepoLookup {
+  return {
+    partitionKey: tenantLookupPartitionKey(entity.tenantId),
+    rowKey: tenantRepoLookupRowKey(entity.repoId),
+    entityType: "TenantRepoLookup",
+    repoId: entity.repoId,
+    repoLabel: entity.repoId,
+    updatedAt: entity.updatedAt
+  };
+}
+
+export function toStoredTenantWorkItemLookup(entity: StoredWorkItemResult): StoredTenantWorkItemLookup {
+  return {
+    partitionKey: tenantLookupPartitionKey(entity.tenantId),
+    rowKey: tenantWorkItemLookupRowKey(entity.createdAt, entity.repoId, entity.workItemId),
+    entityType: "TenantWorkItemLookup",
+    repoId: entity.repoId,
+    workItemId: entity.workItemId,
+    workItemType: entity.workItemType,
+    category: entity.category,
+    title: entity.title,
+    description: entity.description,
+    severity: entity.severity,
+    status: entity.status,
+    source: entity.source,
+    files: entity.files,
+    tags: entity.tags,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+    createdBy: entity.createdBy,
+    createdByUserKey: entity.createdByUserKey || "",
+    assignedTo: entity.assignedTo || "",
+    assignedToUserKey: entity.assignedToUserKey || "",
+    claimedBy: entity.claimedBy || "",
+    claimedAt: entity.claimedAt || "",
+    claimExpiresAt: entity.claimExpiresAt || "",
+    externalBranchName: entity.externalBranchName || "",
+    externalCommitUrl: entity.externalCommitUrl || "",
+    externalPrUrl: entity.externalPrUrl || ""
+  };
+}
+
+export function toWorkItemFromTenantLookup(
+  entity: StoredTenantWorkItemLookupResult,
+  tenantId: string
+): WorkItem {
+  return {
+    tenantId,
+    repoId: entity.repoId,
+    workItemId: entity.workItemId,
+    workItemType: entity.workItemType,
+    category: entity.category,
+    title: entity.title,
+    description: entity.description,
+    severity: entity.severity,
+    status: entity.status,
+    source: entity.source,
+    files: safeParseStringArray(entity.files),
+    tags: safeParseStringArray(entity.tags),
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+    createdBy: entity.createdBy,
+    createdByUserKey: entity.createdByUserKey || "",
+    assignedTo: entity.assignedTo || "",
+    assignedToUserKey: entity.assignedToUserKey || "",
+    claimedBy: entity.claimedBy || "",
+    claimedAt: entity.claimedAt || "",
+    claimExpiresAt: entity.claimExpiresAt || "",
+    externalBranchName: entity.externalBranchName || "",
+    externalCommitUrl: entity.externalCommitUrl || "",
+    externalPrUrl: entity.externalPrUrl || ""
   };
 }
 
@@ -352,6 +504,8 @@ export class ApiKeyNotFoundError extends Error {
 export class WorkItemRepository {
   private readonly workItemsClient: TableClient;
   private readonly eventsClient: TableClient;
+  private readonly enableOptimizedLookupWrites: boolean;
+  private readonly preferOptimizedLookups: boolean;
 
   constructor(config: TraceOpsConfig) {
     this.workItemsClient = TableClient.fromConnectionString(
@@ -362,10 +516,13 @@ export class WorkItemRepository {
       config.storageConnectionString,
       config.workItemEventsTableName
     );
+    this.enableOptimizedLookupWrites = config.enableOptimizedWorkItemLookupWrites;
+    this.preferOptimizedLookups = config.preferOptimizedWorkItemLookups;
   }
 
   async createWorkItem(entity: StoredWorkItem): Promise<WorkItem> {
     await this.workItemsClient.createEntity(entity);
+    await this.writeOptimizedLookupEntities(entity);
     return toWorkItem(entity);
   }
 
@@ -402,6 +559,10 @@ export class WorkItemRepository {
   }
 
   async listWorkItemsForTenant(tenantId: string, limit: number): Promise<StoredWorkItemResult[]> {
+    if (this.preferOptimizedLookups) {
+      return this.listWorkItemsForTenantFromLookup(tenantId, limit);
+    }
+
     const items: StoredWorkItemResult[] = [];
     const filter = odata`tenantId eq ${tenantId}`;
 
@@ -422,6 +583,10 @@ export class WorkItemRepository {
     const items: StoredWorkItemResult[] = [];
 
     for await (const entity of this.workItemsClient.listEntities<StoredWorkItemResult>()) {
+      if (!isPrimaryWorkItemEntity(entity)) {
+        continue;
+      }
+
       items.push(entity);
 
       if (items.length >= limit) {
@@ -433,6 +598,10 @@ export class WorkItemRepository {
   }
 
   async listRepositoryIdsForTenant(tenantId: string, limit = 250): Promise<string[]> {
+    if (this.preferOptimizedLookups) {
+      return this.listRepositoryIdsForTenantFromLookup(tenantId, limit);
+    }
+
     const repoIds = new Set<string>();
     const filter = odata`tenantId eq ${tenantId}`;
 
@@ -454,6 +623,7 @@ export class WorkItemRepository {
   async replaceWorkItem(entity: StoredWorkItemResult): Promise<WorkItem> {
     try {
       await this.workItemsClient.updateEntity(entity, "Replace", { etag: entity.etag });
+      await this.writeOptimizedLookupEntities(entity);
       return toWorkItem(entity);
     } catch (error) {
       if (isPreconditionFailed(error)) {
@@ -466,6 +636,64 @@ export class WorkItemRepository {
 
   async createEvent(event: WorkItemEvent): Promise<void> {
     await this.eventsClient.createEntity(toStoredEvent(event));
+  }
+
+  private async listWorkItemsForTenantFromLookup(
+    tenantId: string,
+    limit: number
+  ): Promise<StoredWorkItemResult[]> {
+    const items: StoredWorkItemResult[] = [];
+    const filter = odata`PartitionKey eq ${tenantLookupPartitionKey(tenantId)} and entityType eq ${"TenantWorkItemLookup"}`;
+
+    for await (const entity of this.workItemsClient.listEntities<StoredTenantWorkItemLookupResult>({
+      queryOptions: { filter }
+    })) {
+      const { entityType: _entityType, ...workItemLookup } = entity;
+      items.push({
+        ...workItemLookup,
+        tenantId,
+        partitionKey: partitionKey(tenantId, workItemLookup.repoId),
+        rowKey: workItemLookup.workItemId
+      });
+
+      if (items.length >= limit) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
+  private async listRepositoryIdsForTenantFromLookup(tenantId: string, limit: number): Promise<string[]> {
+    const repoIds: string[] = [];
+    const filter = odata`PartitionKey eq ${tenantLookupPartitionKey(tenantId)} and entityType eq ${"TenantRepoLookup"}`;
+
+    for await (const entity of this.workItemsClient.listEntities<StoredTenantRepoLookupResult>({
+      queryOptions: { filter, select: ["repoId"] }
+    })) {
+      if (entity.repoId) {
+        repoIds.push(entity.repoId);
+      }
+
+      if (repoIds.length >= limit) {
+        break;
+      }
+    }
+
+    return repoIds.sort((left, right) => left.localeCompare(right));
+  }
+
+  private async writeOptimizedLookupEntities(entity: StoredWorkItemResult): Promise<void> {
+    if (!this.enableOptimizedLookupWrites) {
+      return;
+    }
+
+    try {
+      await this.workItemsClient.upsertEntity(toStoredTenantRepoLookup(entity), "Replace");
+      await this.workItemsClient.upsertEntity(toStoredTenantWorkItemLookup(entity), "Replace");
+    } catch {
+      // Lookup rows are additive only; primary work item writes remain the source of truth.
+    }
   }
 }
 

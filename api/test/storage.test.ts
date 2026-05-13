@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { partitionKey } from "../src/domain.js";
 import {
+  toStoredTenantRepoLookup,
+  toStoredTenantWorkItemLookup,
   apiKeyPartitionKey,
   apiKeyRowKey,
   toApiKey,
@@ -14,6 +16,7 @@ import {
   toStoredWorkItem,
   toTenant,
   toTenantMember,
+  toWorkItemFromTenantLookup,
   toUser,
   toWorkItem
 } from "../src/storage.js";
@@ -98,6 +101,89 @@ describe("storage mapping", () => {
       externalBranchName: "",
       externalCommitUrl: "",
       externalPrUrl: ""
+    });
+  });
+
+  it("creates additive tenant lookup rows from a primary work item without changing the primary row shape", () => {
+    const stored = toStoredWorkItem(
+      {
+        tenantId: "tenant",
+        repoId: "repo",
+        workItemType: "Feature",
+        category: "Performance",
+        title: "Optimize scans",
+        description: "Add lookup rows.",
+        severity: "Medium",
+        status: "Accepted",
+        source: "planning",
+        files: ["api/src/storage.ts"],
+        tags: ["optimization"],
+        createdBy: "codex"
+      },
+      "ITEM~20260501153000~abc123",
+      "2026-05-01T15:30:00.000Z"
+    );
+
+    const repoLookup = toStoredTenantRepoLookup(stored);
+    const itemLookup = toStoredTenantWorkItemLookup(stored);
+
+    expect(repoLookup).toMatchObject({
+      entityType: "TenantRepoLookup",
+      repoId: "repo",
+      repoLabel: "repo"
+    });
+    expect(repoLookup.partitionKey).toBe("TENANT_LOOKUP~dGVuYW50");
+    expect(repoLookup.rowKey).toBe("REPO~cmVwbw");
+
+    expect(itemLookup).toMatchObject({
+      entityType: "TenantWorkItemLookup",
+      repoId: "repo",
+      workItemId: "ITEM~20260501153000~abc123",
+      status: "Accepted",
+      files: "[\"api/src/storage.ts\"]",
+      tags: "[\"optimization\"]"
+    });
+    expect(itemLookup.partitionKey).toBe("TENANT_LOOKUP~dGVuYW50");
+    expect(itemLookup.rowKey).toBe("ITEM~79739498846999~REPO~cmVwbw~ITEM~20260501153000~abc123");
+    expect("tenantId" in itemLookup).toBe(false);
+    expect(toWorkItem(stored)).toMatchObject({
+      tenantId: "tenant",
+      repoId: "repo",
+      workItemId: "ITEM~20260501153000~abc123"
+    });
+  });
+
+  it("restores the API work item shape from a tenant lookup row", () => {
+    const stored = toStoredWorkItem(
+      {
+        tenantId: "tenant",
+        repoId: "repo",
+        workItemType: "Issue",
+        category: "Bug",
+        title: "Broken lookup",
+        description: "Projection should map back.",
+        severity: "High",
+        status: "InProgress",
+        source: "implementation",
+        files: ["api/src/storage.ts"],
+        tags: ["lookup"],
+        createdBy: "codex",
+        assignedTo: "maintainer"
+      },
+      "ITEM~20260501153000~abc123",
+      "2026-05-01T15:30:00.000Z"
+    );
+
+    const lookup = toStoredTenantWorkItemLookup(stored);
+
+    expect(toWorkItemFromTenantLookup(lookup, "tenant")).toMatchObject({
+      tenantId: "tenant",
+      repoId: "repo",
+      workItemId: "ITEM~20260501153000~abc123",
+      status: "InProgress",
+      assignedTo: "maintainer",
+      files: ["api/src/storage.ts"],
+      tags: ["lookup"]
     });
   });
 

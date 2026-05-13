@@ -17,6 +17,8 @@ describe("getConfig", () => {
     expect(config.tenantsTableName).toBe("TraceOpsTenants");
     expect(config.tenantMembersTableName).toBe("TraceOpsTenantMembers");
     expect(config.apiKeysTableName).toBe("TraceOpsApiKeys");
+    expect(config.enableOptimizedWorkItemLookupWrites).toBe(false);
+    expect(config.preferOptimizedWorkItemLookups).toBe(false);
   });
 
   it("accepts identity table name overrides", () => {
@@ -28,7 +30,9 @@ describe("getConfig", () => {
       TRACEOPS_TABLE_TENANTS: "TenantsLocal",
       TRACEOPS_TABLE_TENANT_MEMBERS: "TenantMembersLocal",
       TRACEOPS_TABLE_API_KEYS: "ApiKeysLocal",
-      TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID: " workspace-id "
+      TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID: " workspace-id ",
+      TRACEOPS_ENABLE_OPTIMIZED_WORKITEM_LOOKUP_WRITES: " true ",
+      TRACEOPS_PREFER_OPTIMIZED_WORKITEM_LOOKUPS: "1"
     });
 
     expect(config.usersTableName).toBe("UsersLocal");
@@ -36,6 +40,8 @@ describe("getConfig", () => {
     expect(config.tenantMembersTableName).toBe("TenantMembersLocal");
     expect(config.apiKeysTableName).toBe("ApiKeysLocal");
     expect(config.logAnalyticsWorkspaceId).toBe("workspace-id");
+    expect(config.enableOptimizedWorkItemLookupWrites).toBe(true);
+    expect(config.preferOptimizedWorkItemLookups).toBe(true);
   });
 
   it("rejects a raw API key value", () => {

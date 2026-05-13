@@ -11,7 +11,17 @@ export type TraceOpsConfig = {
   tenantMembersTableName: string;
   apiKeysTableName: string;
   logAnalyticsWorkspaceId?: string;
+  enableOptimizedWorkItemLookupWrites: boolean;
+  preferOptimizedWorkItemLookups: boolean;
 };
+
+function parseBooleanFlag(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
 
 export function getConfig(env: NodeJS.ProcessEnv = process.env): TraceOpsConfig {
   const apiKey = env.TRACEOPS_API_KEY;
@@ -40,6 +50,10 @@ export function getConfig(env: NodeJS.ProcessEnv = process.env): TraceOpsConfig 
     tenantsTableName: env.TRACEOPS_TABLE_TENANTS || "TraceOpsTenants",
     tenantMembersTableName: env.TRACEOPS_TABLE_TENANT_MEMBERS || "TraceOpsTenantMembers",
     apiKeysTableName: env.TRACEOPS_TABLE_API_KEYS || "TraceOpsApiKeys",
-    logAnalyticsWorkspaceId: env.TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID?.trim() || undefined
+    logAnalyticsWorkspaceId: env.TRACEOPS_LOG_ANALYTICS_WORKSPACE_ID?.trim() || undefined,
+    enableOptimizedWorkItemLookupWrites: parseBooleanFlag(
+      env.TRACEOPS_ENABLE_OPTIMIZED_WORKITEM_LOOKUP_WRITES
+    ),
+    preferOptimizedWorkItemLookups: parseBooleanFlag(env.TRACEOPS_PREFER_OPTIMIZED_WORKITEM_LOOKUPS)
   };
 }
