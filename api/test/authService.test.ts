@@ -134,7 +134,7 @@ describe("AuthService", () => {
     });
 
     expect(second.user.loginCount).toBe(2);
-    expect(second.user.isAdmin).toBe(true);
+    expect(second.user.isAdmin).toBe(false);
     expect(second.user.displayName).toBe("Octavia Cat");
     expect(second.user.createdAtUtc).toBe(first.user.createdAtUtc);
     expect(Date.parse(second.user.lastLoginAtUtc)).toBeGreaterThanOrEqual(
@@ -142,6 +142,74 @@ describe("AuthService", () => {
     );
     expect(second.personalTenant).toEqual(first.personalTenant);
     expect(second.memberships).toHaveLength(1);
+  });
+
+  it("does not create an admin user from caller-supplied sync roles", async () => {
+    const { service } = createStores();
+
+    const result = await service.syncUser({
+      identityProvider: "github",
+      providerUserId: "999999",
+      userDetails: "admin-attempt@example.com",
+      displayName: "Admin Attempt",
+      roles: ["admin"]
+    });
+
+    expect(result.user.isAdmin).toBe(false);
+  });
+
+  it("preserves existing admin users even when sync roles do not include admin", async () => {
+    const { service, users } = createStores();
+
+    users.set("github|123456", {
+      userKey: "github|123456",
+      identityProvider: "github",
+      providerUserId: "123456",
+      userDetails: "octocat@example.com",
+      displayName: "Octo Cat",
+      createdAtUtc: "2026-05-01T00:00:00.000Z",
+      lastLoginAtUtc: "2026-05-01T00:00:00.000Z",
+      loginCount: 5,
+      isAdmin: true
+    });
+
+    const result = await service.syncUser({
+      identityProvider: "github",
+      providerUserId: "123456",
+      userDetails: "octocat@example.com",
+      displayName: "Octavia Cat",
+      roles: ["member"]
+    });
+
+    expect(result.user.isAdmin).toBe(true);
+    expect(result.user.loginCount).toBe(6);
+  });
+
+  it("does not promote an existing non-admin user from caller-supplied sync roles", async () => {
+    const { service, users } = createStores();
+
+    users.set("github|123456", {
+      userKey: "github|123456",
+      identityProvider: "github",
+      providerUserId: "123456",
+      userDetails: "octocat@example.com",
+      displayName: "Octo Cat",
+      createdAtUtc: "2026-05-01T00:00:00.000Z",
+      lastLoginAtUtc: "2026-05-01T00:00:00.000Z",
+      loginCount: 2,
+      isAdmin: false
+    });
+
+    const result = await service.syncUser({
+      identityProvider: "github",
+      providerUserId: "123456",
+      userDetails: "octocat@example.com",
+      displayName: "Octavia Cat",
+      roles: ["admin"]
+    });
+
+    expect(result.user.isAdmin).toBe(false);
+    expect(result.user.loginCount).toBe(3);
   });
 
   it("uses userDetails as the fallback display name for personal tenants", async () => {

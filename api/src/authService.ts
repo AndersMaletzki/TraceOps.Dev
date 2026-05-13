@@ -142,7 +142,7 @@ export class AuthService {
       createdAtUtc: existingUser?.createdAtUtc || now,
       lastLoginAtUtc: now,
       loginCount: (existingUser?.loginCount || 0) + 1,
-      isAdmin: input.roles.includes("admin")
+      isAdmin: existingUser?.isAdmin || false
     };
 
     if (!existingUser) {
