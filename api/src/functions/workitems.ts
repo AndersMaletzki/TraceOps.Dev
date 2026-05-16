@@ -16,6 +16,7 @@ import {
   parseFiltersFromQuery,
   parseLinksBody,
   parseTenantRepoBody,
+  parseWorkItemReadView,
   parseUpdateStatusBody,
   readJson
 } from "../http.js";
@@ -30,7 +31,7 @@ let cachedApiKeyService: ApiKeyService | undefined;
 
 type WorkItemsModuleOverrides = {
   config?: TraceOpsConfig;
-  service?: Pick<WorkItemService, "create" | "list" | "get" | "getNext" | "updateStatus" | "claim" | "updateLinks" | "listAppWorkItems">;
+  service?: Pick<WorkItemService, "create" | "list" | "listSummaries" | "get" | "getSummary" | "getNext" | "updateStatus" | "claim" | "updateLinks" | "listAppWorkItems">;
   authService?: Pick<AuthService, "assertTenantMember">;
   apiKeyService?: Pick<ApiKeyService, "authenticatePersonalApiKey">;
 };
@@ -143,7 +144,8 @@ export async function listWorkItems(
     assertApiKeyScope(auth, "workitems:read");
     assertAuthorizedTenant(auth, filters.tenantId);
 
-    const workItems = await service.list(filters);
+    const view = parseWorkItemReadView(request);
+    const workItems = view === "summary" ? await service.listSummaries(filters) : await service.list(filters);
     return json(200, { items: workItems, count: workItems.length });
   });
 }

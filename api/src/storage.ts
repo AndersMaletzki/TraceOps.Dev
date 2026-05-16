@@ -11,7 +11,9 @@ import {
   TraceOpsUser,
   UpdateLinksInput,
   WorkItem,
-  WorkItemEvent
+  WorkItemEvent,
+  WorkItemFilters,
+  WorkItemSummary
 } from "./domain.js";
 
 type StoredWorkItem = Omit<WorkItem, "files" | "tags"> & {
@@ -169,6 +171,79 @@ type StoredTenantWorkItemLookupResult = Partial<StoredTenantWorkItemLookup> &
     etag?: string;
   };
 
+export type StoredWorkItemSummaryResult = Partial<StoredWorkItem> &
+  Pick<
+    StoredWorkItem,
+    | "partitionKey"
+    | "rowKey"
+    | "tenantId"
+    | "repoId"
+    | "workItemId"
+    | "workItemType"
+    | "category"
+    | "title"
+    | "severity"
+    | "status"
+    | "createdAt"
+    | "updatedAt"
+  > & {
+    etag?: string;
+  };
+
+type StoredTenantWorkItemLookupSummaryResult = Partial<StoredTenantWorkItemLookup> &
+  Pick<
+    StoredTenantWorkItemLookup,
+    | "partitionKey"
+    | "rowKey"
+    | "entityType"
+    | "repoId"
+    | "workItemId"
+    | "workItemType"
+    | "category"
+    | "title"
+    | "severity"
+    | "status"
+    | "createdAt"
+    | "updatedAt"
+  > & {
+    etag?: string;
+  };
+
+export const workItemSummarySelectFields = [
+  "tenantId",
+  "repoId",
+  "workItemId",
+  "workItemType",
+  "category",
+  "title",
+  "severity",
+  "status",
+  "assignedToUserKey",
+  "claimedBy",
+  "createdAt",
+  "updatedAt",
+  "externalPrUrl",
+  "externalCommitUrl",
+  "externalBranchName"
+] as const;
+
+const tenantWorkItemSummarySelectFields = [
+  "repoId",
+  "workItemId",
+  "workItemType",
+  "category",
+  "title",
+  "severity",
+  "status",
+  "assignedToUserKey",
+  "claimedBy",
+  "createdAt",
+  "updatedAt",
+  "externalPrUrl",
+  "externalCommitUrl",
+  "externalBranchName"
+] as const;
+
 function safeParseStringArray(value: string | undefined): string[] {
   if (!value) {
     return [];
@@ -213,6 +288,74 @@ function isPrimaryWorkItemEntity(entity: Pick<StoredWorkItemResult, "partitionKe
   return entity.partitionKey.includes("~REPO~") && entity.rowKey.startsWith("ITEM~");
 }
 
+function odataString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+export function buildWorkItemSummaryFilter(
+  filters: Pick<WorkItemFilters, "tenantId" | "repoId" | "status" | "severity" | "workItemType" | "category" | "workItemId">
+): string {
+  const clauses = [`PartitionKey eq ${odataString(partitionKey(filters.tenantId, filters.repoId))}`];
+
+  if (filters.workItemId) {
+    clauses.push(`RowKey eq ${odataString(filters.workItemId)}`);
+  }
+
+  if (filters.status) {
+    clauses.push(`status eq ${odataString(filters.status)}`);
+  }
+
+  if (filters.severity) {
+    clauses.push(`severity eq ${odataString(filters.severity)}`);
+  }
+
+  if (filters.workItemType) {
+    clauses.push(`workItemType eq ${odataString(filters.workItemType)}`);
+  }
+
+  if (filters.category) {
+    clauses.push(`category eq ${odataString(filters.category)}`);
+  }
+
+  return clauses.join(" and ");
+}
+
+function buildTenantWorkItemLookupSummaryFilter(
+  tenantId: string,
+  filters: Pick<WorkItemFilters, "repoId" | "status" | "severity" | "workItemType" | "category" | "workItemId">
+): string {
+  const clauses = [
+    `PartitionKey eq ${odataString(tenantLookupPartitionKey(tenantId))}`,
+    `entityType eq ${odataString("TenantWorkItemLookup")}`
+  ];
+
+  if (filters.repoId) {
+    clauses.push(`repoId eq ${odataString(filters.repoId)}`);
+  }
+
+  if (filters.workItemId) {
+    clauses.push(`workItemId eq ${odataString(filters.workItemId)}`);
+  }
+
+  if (filters.status) {
+    clauses.push(`status eq ${odataString(filters.status)}`);
+  }
+
+  if (filters.severity) {
+    clauses.push(`severity eq ${odataString(filters.severity)}`);
+  }
+
+  if (filters.workItemType) {
+    clauses.push(`workItemType eq ${odataString(filters.workItemType)}`);
+  }
+
+  if (filters.category) {
+    clauses.push(`category eq ${odataString(filters.category)}`);
+  }
+
+  return clauses.join(" and ");
+}
+
 export function toWorkItem(entity: StoredWorkItemResult): WorkItem {
   return {
     tenantId: entity.tenantId,
@@ -239,6 +382,23 @@ export function toWorkItem(entity: StoredWorkItemResult): WorkItem {
     externalBranchName: entity.externalBranchName || "",
     externalCommitUrl: entity.externalCommitUrl || "",
     externalPrUrl: entity.externalPrUrl || ""
+  };
+}
+
+export function toWorkItemSummary(entity: StoredWorkItemSummaryResult): WorkItemSummary {
+  return {
+    workItemId: entity.workItemId,
+    repositoryId: entity.repoId,
+    title: entity.title,
+    status: entity.status,
+    severity: entity.severity,
+    workItemType: entity.workItemType,
+    category: entity.category,
+    assignedToUserKey: entity.assignedToUserKey || "",
+    claimedByUserKey: entity.claimedBy || "",
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+    externalLink: entity.externalPrUrl || entity.externalCommitUrl || entity.externalBranchName || ""
   };
 }
 
@@ -353,6 +513,18 @@ export function toWorkItemFromTenantLookup(
     externalCommitUrl: entity.externalCommitUrl || "",
     externalPrUrl: entity.externalPrUrl || ""
   };
+}
+
+export function toWorkItemSummaryFromTenantLookup(
+  entity: StoredTenantWorkItemLookupSummaryResult,
+  tenantId: string
+): WorkItemSummary {
+  return toWorkItemSummary({
+    ...entity,
+    tenantId,
+    partitionKey: partitionKey(tenantId, entity.repoId),
+    rowKey: entity.workItemId
+  });
 }
 
 export function tenantMemberPartitionKey(tenantId: string): string {
@@ -558,6 +730,23 @@ export class WorkItemRepository {
     return items;
   }
 
+  async listWorkItemSummaries(filters: WorkItemFilters): Promise<WorkItemSummary[]> {
+    const items: WorkItemSummary[] = [];
+    const filter = buildWorkItemSummaryFilter(filters);
+
+    for await (const entity of this.workItemsClient.listEntities<StoredWorkItemSummaryResult>({
+      queryOptions: { filter, select: [...workItemSummarySelectFields] }
+    })) {
+      items.push(toWorkItemSummary(entity));
+
+      if (items.length >= filters.limit) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
   async listWorkItemsForTenant(tenantId: string, limit: number): Promise<StoredWorkItemResult[]> {
     if (this.preferOptimizedLookups) {
       return this.listWorkItemsForTenantFromLookup(tenantId, limit);
@@ -579,6 +768,14 @@ export class WorkItemRepository {
     return items;
   }
 
+  async listWorkItemSummariesForTenant(filters: WorkItemFilters): Promise<WorkItemSummary[]> {
+    if (this.preferOptimizedLookups) {
+      return this.listWorkItemSummariesForTenantFromLookup(filters);
+    }
+
+    return this.listWorkItemSummaries(filters);
+  }
+
   async listAllWorkItems(limit: number): Promise<StoredWorkItemResult[]> {
     const items: StoredWorkItemResult[] = [];
 
@@ -595,6 +792,23 @@ export class WorkItemRepository {
     }
 
     return items;
+  }
+
+  async getWorkItemSummary(tenantId: string, repoId: string, workItemId: string): Promise<WorkItemSummary> {
+    try {
+      const entity = await this.workItemsClient.getEntity<StoredWorkItemSummaryResult>(
+        partitionKey(tenantId, repoId),
+        workItemId,
+        { queryOptions: { select: [...workItemSummarySelectFields] } }
+      );
+      return toWorkItemSummary(entity);
+    } catch (error) {
+      if (isNotFound(error)) {
+        throw new WorkItemNotFoundError(workItemId);
+      }
+
+      throw error;
+    }
   }
 
   async listRepositoryIdsForTenant(tenantId: string, limit = 250): Promise<string[]> {
@@ -657,6 +871,23 @@ export class WorkItemRepository {
       });
 
       if (items.length >= limit) {
+        break;
+      }
+    }
+
+    return items;
+  }
+
+  private async listWorkItemSummariesForTenantFromLookup(filters: WorkItemFilters): Promise<WorkItemSummary[]> {
+    const items: WorkItemSummary[] = [];
+    const filter = buildTenantWorkItemLookupSummaryFilter(filters.tenantId, filters);
+
+    for await (const entity of this.workItemsClient.listEntities<StoredTenantWorkItemLookupSummaryResult>({
+      queryOptions: { filter, select: [...tenantWorkItemSummarySelectFields] }
+    })) {
+      items.push(toWorkItemSummaryFromTenantLookup(entity, filters.tenantId));
+
+      if (items.length >= filters.limit) {
         break;
       }
     }

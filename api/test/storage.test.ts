@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { partitionKey } from "../src/domain.js";
 import {
+  buildWorkItemSummaryFilter,
   toStoredTenantRepoLookup,
   toStoredTenantWorkItemLookup,
   apiKeyPartitionKey,
@@ -16,6 +17,8 @@ import {
   toStoredWorkItem,
   toTenant,
   toTenantMember,
+  toWorkItemSummary,
+  workItemSummarySelectFields,
   toWorkItemFromTenantLookup,
   toUser,
   toWorkItem
@@ -102,6 +105,89 @@ describe("storage mapping", () => {
       externalCommitUrl: "",
       externalPrUrl: ""
     });
+  });
+
+  it("maps compact work item summaries without large detail fields", () => {
+    const stored = toStoredWorkItem(
+      {
+        tenantId: "tenant",
+        repoId: "repo",
+        workItemType: "Issue",
+        category: "Bug",
+        title: "Broken API",
+        description: "Large markdown body",
+        severity: "High",
+        status: "InProgress",
+        source: "manual",
+        files: ["api/src/storage.ts"],
+        tags: ["large"],
+        createdBy: "codex",
+        assignedToUserKey: "github|789",
+        externalPrUrl: "https://github.com/AndersMaletzki/TraceOps.Dev/pull/1"
+      },
+      "ITEM~20260501153000~abc123",
+      "2026-05-01T15:30:00.000Z"
+    );
+    stored.claimedBy = "github|123456";
+
+    const summary = toWorkItemSummary(stored);
+
+    expect(summary).toEqual({
+      workItemId: "ITEM~20260501153000~abc123",
+      repositoryId: "repo",
+      title: "Broken API",
+      status: "InProgress",
+      severity: "High",
+      workItemType: "Issue",
+      category: "Bug",
+      assignedToUserKey: "github|789",
+      claimedByUserKey: "github|123456",
+      createdAt: "2026-05-01T15:30:00.000Z",
+      updatedAt: "2026-05-01T15:30:00.000Z",
+      externalLink: "https://github.com/AndersMaletzki/TraceOps.Dev/pull/1"
+    });
+    expect(summary).not.toHaveProperty("description");
+    expect(summary).not.toHaveProperty("files");
+    expect(summary).not.toHaveProperty("tags");
+  });
+
+  it("defines Azure Table summary projections without large fields", () => {
+    expect(workItemSummarySelectFields).toEqual([
+      "tenantId",
+      "repoId",
+      "workItemId",
+      "workItemType",
+      "category",
+      "title",
+      "severity",
+      "status",
+      "assignedToUserKey",
+      "claimedBy",
+      "createdAt",
+      "updatedAt",
+      "externalPrUrl",
+      "externalCommitUrl",
+      "externalBranchName"
+    ]);
+    expect(workItemSummarySelectFields).not.toContain("description");
+    expect(workItemSummarySelectFields).not.toContain("files");
+    expect(workItemSummarySelectFields).not.toContain("tags");
+  });
+
+  it("pushes summary filters into the Azure Table query", () => {
+    expect(
+      buildWorkItemSummaryFilter({
+        tenantId: "tenant",
+        repoId: "repo",
+        workItemId: "ITEM~1",
+        status: "InProgress",
+        severity: "High",
+        workItemType: "Issue",
+        category: "Bug"
+      })
+    ).toBe(
+      "PartitionKey eq 'TENANT~dGVuYW50~REPO~cmVwbw' and RowKey eq 'ITEM~1' and status eq 'InProgress' and severity eq 'High' and workItemType eq 'Issue' and category eq 'Bug'"
+    );
   });
 
   it("creates additive tenant lookup rows from a primary work item without changing the primary row shape", () => {

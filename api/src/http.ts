@@ -22,7 +22,8 @@ import {
   workItemSeverities,
   workItemStatuses,
   workItemTypes,
-  WorkItemFilters
+  WorkItemFilters,
+  WorkItemReadView
 } from "./domain.js";
 import { WorkItemConflictError, WorkItemNotFoundError } from "./workItemService.js";
 
@@ -107,8 +108,13 @@ export function parseFiltersFromQuery(request: HttpRequest): WorkItemFilters {
     severity: parseOptionalEnum(request.query.get("severity"), workItemSeverities, "severity"),
     workItemType: parseOptionalEnum(request.query.get("workItemType"), workItemTypes, "workItemType"),
     category: parseOptionalEnum(request.query.get("category"), workItemCategories, "category"),
+    workItemId: request.query.get("workItemId")?.trim() || undefined,
     limit: parseLimit(request.query.get("limit"))
   };
+}
+
+export function parseWorkItemReadView(request: HttpRequest): WorkItemReadView {
+  return parseOptionalEnum(request.query.get("view"), ["summary", "detail"] as const, "view") || "detail";
 }
 
 export function parseCallerUserKey(request: HttpRequest): string | undefined {

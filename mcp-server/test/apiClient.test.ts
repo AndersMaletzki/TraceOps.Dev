@@ -29,7 +29,7 @@ describe("TraceOpsApiClient", () => {
       RequestInit | undefined
     ];
     expect(String(url)).toBe(
-      "http://localhost:7071/api/workitems?tenantId=tenant&repoId=repo&status=New&severity=High&workItemType=AuditFinding&limit=10"
+      "http://localhost:7071/api/workitems?tenantId=tenant&repoId=repo&status=New&severity=High&workItemType=AuditFinding&limit=10&view=summary"
     );
     expect(init).toMatchObject({
       method: "GET",
@@ -37,6 +37,46 @@ describe("TraceOpsApiClient", () => {
         "x-api-key": testRawApiKey
       })
     });
+  });
+
+  it("gets one work item summary through the summary list path", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              workItemId: "ITEM~1",
+              repositoryId: "repo",
+              title: "Compact",
+              status: "New",
+              severity: "High",
+              workItemType: "Issue",
+              category: "Bug",
+              assignedToUserKey: "",
+              claimedByUserKey: "",
+              createdAt: "2026-05-01T00:00:00.000Z",
+              updatedAt: "2026-05-01T00:00:00.000Z",
+              externalLink: ""
+            }
+          ],
+          count: 1
+        }),
+        { status: 200 }
+      );
+    });
+
+    const client = new TraceOpsApiClient("http://localhost:7071/api", testPersonalApiKey, fetchMock as unknown as typeof fetch);
+    const summary = await client.getWorkItemSummary({
+      tenantId: "tenant",
+      repoId: "repo",
+      workItemId: "ITEM~1"
+    });
+
+    expect(summary).toMatchObject({ workItemId: "ITEM~1", title: "Compact" });
+    const [url] = fetchMock.mock.calls[0] as unknown as [URL | RequestInfo, RequestInit | undefined];
+    expect(String(url)).toBe(
+      "http://localhost:7071/api/workitems?tenantId=tenant&repoId=repo&workItemId=ITEM%7E1&limit=50&view=summary"
+    );
   });
 
   it("sends link metadata without performing repository operations", async () => {

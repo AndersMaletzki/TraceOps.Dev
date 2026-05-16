@@ -159,6 +159,21 @@ export type WorkItem = {
   externalPrUrl: string;
 };
 
+export type WorkItemSummary = {
+  workItemId: string;
+  repositoryId: string;
+  title: string;
+  status: WorkItemStatus;
+  severity: WorkItemSeverity;
+  workItemType: WorkItemType;
+  category: WorkItemCategory;
+  assignedToUserKey: string;
+  claimedByUserKey: string;
+  createdAt: string;
+  updatedAt: string;
+  externalLink: string;
+};
+
 export type CreateWorkItemInput = {
   tenantId: string;
   repoId: string;
@@ -188,8 +203,11 @@ export type WorkItemFilters = {
   severity?: WorkItemSeverity;
   workItemType?: WorkItemType;
   category?: WorkItemCategory;
+  workItemId?: string;
   limit: number;
 };
+
+export type WorkItemReadView = "detail" | "summary";
 
 export type RepositoryOption = {
   tenantId: string;

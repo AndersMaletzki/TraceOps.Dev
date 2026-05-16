@@ -28,30 +28,42 @@ export type WorkItemStatus = (typeof workItemStatuses)[number];
 
 export type WorkItemSummary = {
   workItemId: string;
+  repositoryId: string;
   workItemType: WorkItemType;
   category: WorkItemCategory;
   title: string;
   severity: WorkItemSeverity;
   status: WorkItemStatus;
-  assignedTo: string;
-  assignedToUserKey?: string;
-  claimedBy: string;
-  claimExpiresAt: string;
+  assignedToUserKey: string;
+  claimedByUserKey: string;
+  createdAt: string;
   updatedAt: string;
-  externalBranchName: string;
-  externalCommitUrl: string;
-  externalPrUrl: string;
+  externalLink: string;
 };
 
-export type WorkItem = WorkItemSummary & {
+export type WorkItem = {
   tenantId: string;
   repoId: string;
+  workItemId: string;
+  workItemType: WorkItemType;
+  category: WorkItemCategory;
+  title: string;
   description: string;
+  severity: WorkItemSeverity;
+  status: WorkItemStatus;
   source: string;
   files: string[];
   tags: string[];
   createdAt: string;
+  updatedAt: string;
   createdBy: string;
   createdByUserKey?: string;
+  assignedTo: string;
+  assignedToUserKey?: string;
+  claimedBy: string;
   claimedAt: string;
+  claimExpiresAt: string;
+  externalBranchName: string;
+  externalCommitUrl: string;
+  externalPrUrl: string;
 };

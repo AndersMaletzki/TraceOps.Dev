@@ -47,7 +47,9 @@ function createWorkItemsService() {
   return {
     create: vi.fn(async () => ({ workItemId: "ITEM~1" })),
     list: vi.fn(async () => []),
+    listSummaries: vi.fn(async () => []),
     get: vi.fn(async () => ({ workItemId: "ITEM~1" })),
+    getSummary: vi.fn(async () => ({ workItemId: "ITEM~1" })),
     getNext: vi.fn(async () => ({ workItemId: "ITEM~1" })),
     updateStatus: vi.fn(async () => ({ workItemId: "ITEM~1" })),
     claim: vi.fn(async () => ({ workItemId: "ITEM~1" })),
@@ -231,6 +233,116 @@ describe("tenant-scoped work item auth enforcement", () => {
         callerUserKey: "github|123456"
       })
     );
+  });
+
+  it("keeps GET /workitems defaulting to detail for backward compatibility", async () => {
+    const { setWorkItemsModuleTestOverrides, listWorkItems } = await import("../src/functions/workitems.js");
+    const service = createWorkItemsService();
+    service.list.mockResolvedValue([
+      {
+        workItemId: "ITEM~1",
+        tenantId: "tenant",
+        repoId: "repo",
+        description: "full detail"
+      }
+    ]);
+
+    setWorkItemsModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service,
+      authService: {
+        assertTenantMember: vi.fn(async () => undefined)
+      },
+      apiKeyService: {
+        authenticatePersonalApiKey: vi.fn(async () => ({
+          kind: "personal" as const,
+          apiKeyId: "key_123",
+          tenantId: "tenant",
+          userKey: "github|123456",
+          scopes: ["workitems:read"]
+        }))
+      }
+    });
+
+    const response = await listWorkItems(
+      request({
+        headers: { authorization: "Bearer trc_live_abc123def456_secret" },
+        query: { tenantId: "tenant", repoId: "repo" }
+      }),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        items: [expect.objectContaining({ description: "full detail" })],
+        count: 1
+      }
+    });
+    expect(service.list).toHaveBeenCalled();
+    expect(service.listSummaries).not.toHaveBeenCalled();
+  });
+
+  it("returns compact DTOs for GET /workitems?view=summary", async () => {
+    const { setWorkItemsModuleTestOverrides, listWorkItems } = await import("../src/functions/workitems.js");
+    const service = createWorkItemsService();
+    service.listSummaries.mockResolvedValue([
+      {
+        workItemId: "ITEM~1",
+        repositoryId: "repo",
+        title: "Compact",
+        status: "New",
+        severity: "High",
+        workItemType: "Issue",
+        category: "Bug",
+        assignedToUserKey: "",
+        claimedByUserKey: "",
+        createdAt: "2026-05-01T00:00:00.000Z",
+        updatedAt: "2026-05-01T00:00:00.000Z",
+        externalLink: ""
+      }
+    ]);
+
+    setWorkItemsModuleTestOverrides({
+      config: configWithApiKey(localDevKeyHash),
+      service,
+      authService: {
+        assertTenantMember: vi.fn(async () => undefined)
+      },
+      apiKeyService: {
+        authenticatePersonalApiKey: vi.fn(async () => ({
+          kind: "personal" as const,
+          apiKeyId: "key_123",
+          tenantId: "tenant",
+          userKey: "github|123456",
+          scopes: ["workitems:read"]
+        }))
+      }
+    });
+
+    const response = await listWorkItems(
+      request({
+        headers: { authorization: "Bearer trc_live_abc123def456_secret" },
+        query: { tenantId: "tenant", repoId: "repo", view: "summary" }
+      }),
+      {} as never
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      jsonBody: {
+        items: [expect.not.objectContaining({ description: expect.anything(), files: expect.anything(), tags: expect.anything() })],
+        count: 1
+      }
+    });
+    expect(service.listSummaries).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: "tenant",
+        repoId: "repo",
+        callerUserKey: "github|123456"
+      })
+    );
+    expect(service.list).not.toHaveBeenCalled();
   });
 
   it("keeps personal bearer auth working for tenant-scoped writes", async () => {

@@ -286,6 +286,31 @@ Work item fields:
 - `externalCommitUrl`
 - `externalPrUrl`
 
+Summary-first reads:
+
+- `GET /workitems` supports `view=summary|detail`; the default is `detail` for backward compatibility.
+- `GET /workitems?view=summary` returns `WorkItemSummary` DTOs shaped by the API, service, and storage layers instead of returning full work items for callers to trim later.
+- `GET /workitems/{workItemId}` remains a full-detail read. List/search callers escalate to this route only when description, files, tags, or other detail-only fields are explicitly needed.
+- MCP list-style tools (`search_workitems`, `get_active_workitems`, `get_recent_workitems`, and `get_workitem_summary`) use summary reads to reduce Azure Table payload reads, API serialization, MCP transport size, and LLM token pressure.
+- Summary storage reads use Azure Table `select` projections and push supported filters (`status`, `severity`, `workItemType`, `category`, and exact `workItemId` when supplied) into the table query. Service-layer filtering still runs afterward as a correctness guard.
+
+`WorkItemSummary` fields are intentionally compact:
+
+- `workItemId`
+- `repositoryId`
+- `title`
+- `status`
+- `severity`
+- `workItemType`
+- `category`
+- `assignedToUserKey`
+- `claimedByUserKey`
+- `createdAt`
+- `updatedAt`
+- `externalLink`
+
+Summary responses must not include `description`, markdown bodies, comments, history, files, tags, relations, audit details, or large metadata blobs.
+
 Allowed work item types:
 
 - `Issue`

@@ -28,19 +28,17 @@ const filterSchema = {
 function summarize(workItem: WorkItem): WorkItemSummary {
   return {
     workItemId: workItem.workItemId,
+    repositoryId: workItem.repoId,
     workItemType: workItem.workItemType,
     category: workItem.category,
     title: workItem.title,
     severity: workItem.severity,
     status: workItem.status,
-    assignedTo: workItem.assignedTo,
-    assignedToUserKey: workItem.assignedToUserKey,
-    claimedBy: workItem.claimedBy,
-    claimExpiresAt: workItem.claimExpiresAt,
+    assignedToUserKey: workItem.assignedToUserKey || "",
+    claimedByUserKey: workItem.claimedBy || "",
+    createdAt: workItem.createdAt,
     updatedAt: workItem.updatedAt,
-    externalBranchName: workItem.externalBranchName,
-    externalCommitUrl: workItem.externalCommitUrl,
-    externalPrUrl: workItem.externalPrUrl
+    externalLink: workItem.externalPrUrl || workItem.externalCommitUrl || workItem.externalBranchName || ""
   };
 }
 
@@ -163,8 +161,52 @@ export function registerTraceOpsTools(
       const response = await client.searchWorkItems(resolved.input);
       return result({
         count: response.count,
-        items: response.items.map(summarize)
+        items: response.items
       });
+    }
+  );
+
+  server.tool(
+    "get_active_workitems",
+    "Get compact summaries for currently active TraceOps work items.",
+    {
+      ...tenantRepoSchema,
+      severity: z.enum(workItemSeverities).optional(),
+      workItemType: z.enum(workItemTypes).optional(),
+      category: z.enum(workItemCategories).optional(),
+      limit: z.number().int().min(1).max(50).default(10)
+    },
+    async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(await client.getActiveWorkItems(resolved.input));
+    }
+  );
+
+  server.tool(
+    "get_recent_workitems",
+    "Get compact summaries for recent TraceOps work items.",
+    filterSchema,
+    async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(await client.getRecentWorkItems(resolved.input));
     }
   );
 
@@ -191,6 +233,28 @@ export function registerTraceOpsTools(
   );
 
   server.tool(
+    "get_workitem_summary",
+    "Get one compact TraceOps work item summary without loading full details.",
+    {
+      ...tenantRepoSchema,
+      workItemId: z.string().min(1)
+    },
+    async (input) => {
+      const authGuardrail = tenantScopedAuthGuardrail(client);
+      if (authGuardrail) {
+        return authGuardrail;
+      }
+
+      const resolved = withResolvedTenant(input, context);
+      if (!resolved.ok) {
+        return result(resolved.error);
+      }
+
+      return result(await client.getWorkItemSummary(resolved.input));
+    }
+  );
+
+  server.tool(
     "get_next_workitem",
     "Get the next actionable TraceOps work item.",
     filterSchema,
@@ -205,7 +269,7 @@ export function registerTraceOpsTools(
         return result(resolved.error);
       }
 
-      return result(summarize(await client.getNextWorkItem(resolved.input)));
+      return result(await client.getNextWorkItem(resolved.input));
     }
   );
 

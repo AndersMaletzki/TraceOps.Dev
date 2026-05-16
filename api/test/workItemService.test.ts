@@ -77,6 +77,50 @@ describe("WorkItemService", () => {
     expect(repository.listWorkItems).toHaveBeenCalledWith("tenant", "repo", 250);
   });
 
+  it("allows a tenant member to list compact work item summaries", async () => {
+    const repository = {
+      listWorkItemSummaries: vi.fn(async () => [
+        {
+          workItemId: "ITEM~20260501153000~abc123",
+          repositoryId: "repo",
+          title: "Broken API",
+          status: "New",
+          severity: "High",
+          workItemType: "Issue",
+          category: "Bug",
+          assignedToUserKey: "",
+          claimedByUserKey: "",
+          createdAt: "2026-05-01T15:30:00.000Z",
+          updatedAt: "2026-05-01T15:30:00.000Z",
+          externalLink: ""
+        }
+      ])
+    } as unknown as WorkItemRepository;
+    const authService = {
+      assertTenantMember: vi.fn(async () => undefined),
+      listUserTenants: vi.fn()
+    };
+
+    const service = new WorkItemService(repository, authService);
+    const items = await service.listSummaries({
+      tenantId: "tenant",
+      repoId: "repo",
+      callerUserKey: "github|123456",
+      limit: 100
+    });
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).not.toHaveProperty("description");
+    expect(authService.assertTenantMember).toHaveBeenCalledWith("github|123456", "tenant");
+    expect(repository.listWorkItemSummaries).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: "tenant",
+        repoId: "repo",
+        limit: 50
+      })
+    );
+  });
+
   it("rejects a non-member before listing tenant work items", async () => {
     const repository = {
       listWorkItems: vi.fn()

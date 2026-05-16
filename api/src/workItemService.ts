@@ -11,7 +11,8 @@ import {
   UpdateStatusInput,
   WorkItem,
   WorkItemEvent,
-  WorkItemFilters
+  WorkItemFilters,
+  WorkItemSummary
 } from "./domain.js";
 import { chooseActiveTenantId } from "./authService.js";
 import type { AuthService } from "./authService.js";
@@ -46,8 +47,12 @@ export function newEventId(date = new Date()): string {
   return `EVT~${sortableTimestamp(date)}~${newShortId()}`;
 }
 
-export function matchesFilters(workItem: WorkItem, filters: Omit<WorkItemFilters, "tenantId" | "repoId" | "limit">): boolean {
+export function matchesFilters(
+  workItem: Pick<WorkItem, "workItemId" | "status" | "severity" | "workItemType" | "category">,
+  filters: Omit<WorkItemFilters, "tenantId" | "repoId" | "limit">
+): boolean {
   return (
+    (!filters.workItemId || !("workItemId" in workItem) || workItem.workItemId === filters.workItemId) &&
     (!filters.status || workItem.status === filters.status) &&
     (!filters.severity || workItem.severity === filters.severity) &&
     (!filters.workItemType || workItem.workItemType === filters.workItemType) &&
@@ -152,6 +157,15 @@ export class WorkItemService {
       .slice(0, filters.limit);
   }
 
+  async listSummaries(filters: WorkItemFilters): Promise<WorkItemSummary[]> {
+    await this.assertTenantAccess(filters.callerUserKey, filters.tenantId);
+
+    const summaries = await this.repository.listWorkItemSummaries({ ...filters, limit: Math.min(filters.limit, 50) });
+    return summaries
+      .filter((workItem) => matchesFilters(workItem, filters))
+      .slice(0, filters.limit);
+  }
+
   async listAppWorkItems(filters: AppWorkItemFilters): Promise<AppWorkItemsResult> {
     const activeTenantId = filters.tenantId
       ? (await this.getValidatedSingleTenantMembership(filters.callerUserKey, filters.tenantId))[0]?.tenantId
@@ -178,6 +192,17 @@ export class WorkItemService {
     await this.assertTenantAccess(callerUserKey, tenantId);
 
     return toWorkItem(await this.repository.getWorkItem(tenantId, repoId, workItemId));
+  }
+
+  async getSummary(
+    tenantId: string,
+    repoId: string,
+    workItemId: string,
+    callerUserKey?: string
+  ): Promise<WorkItemSummary> {
+    await this.assertTenantAccess(callerUserKey, tenantId);
+
+    return this.repository.getWorkItemSummary(tenantId, repoId, workItemId);
   }
 
   async getNext(filters: WorkItemFilters): Promise<WorkItem | undefined> {
